@@ -18,6 +18,7 @@ TCBptr YKCurrentTask = 0; //
 int IdleStk[IDLE_STACK_SIZE];
 void YKIdleTask(void);
 
+extern void asm_save_context(void);
 extern void asm_load_context(void);
 extern void asm_mutex(void);
 extern void asm_unmutex(void);
@@ -25,6 +26,7 @@ extern void asm_unmutex(void);
 //Initializes all required kernel data structures
 void YKInitialize(void){
 	int i;
+	YKEnterMutex();
 	printString("Entering YKInitialize...\n");
     YKAvailTCBList = &(YKTCBArray[0]);
     for (i = 0; i < MAX_TASK_COUNT+1; i++)
@@ -32,21 +34,19 @@ void YKInitialize(void){
     YKTCBArray[MAX_TASK_COUNT+1].next = NULL;
 	YKNewTask(YKIdleTask, (void *)&IdleStk[IDLE_STACK_SIZE], MAX_TASK_COUNT+1);
 	YKCurrentTask = YKRdyList; // Set the initial current task to the Idle task
-/*
-Create the idle task using YKNewTask with lowest priority;
-Load initial values into registers?
-*/
+	YKExitMutex();
 }
 
 //Creates a new task
 void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority){
 	TCBptr tmp, tmp2;
+	YKEnterMutex();
 	printString("Entering YKNewTask...\n");
 
 	tmp = YKAvailTCBList;
     YKAvailTCBList = tmp->next;
 	tmp->stackptr = taskStack;
-	tmp->pc = task;
+	tmp->ip = task;
 	tmp->ax = 0;
 	tmp->bx = 0;
 	tmp->cx = 0;
@@ -72,19 +72,19 @@ void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority){
 			tmp2 = tmp2->next;	/* assumes idle task is at end */
 		}
 		if (tmp2->prev == NULL){	/* insert in list before tmp2 */
-			printString("here1\n");
 			YKRdyList = tmp;
 			tmp->prev = NULL;
 			tmp->next = tmp2;
 			tmp2->prev = tmp;
 		}else{
-			printString("here2\n");
 			tmp2->prev->next = tmp;
 			tmp->prev = tmp2->prev;
 			tmp->next = tmp2;
 			tmp2->prev = tmp;
 		}
     }
+
+	/*
 	printInt(YKRdyList->priority);
 	printString("\n");
 	printInt(YKRdyList->next->priority);
@@ -93,14 +93,16 @@ void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority){
 	printString("\n");
 	printInt(YKRdyList->next->next->next->priority);
 	printString("\n");
+	*/
+	YKExitMutex();
 	if(YKRunState){ // If YKRun has been called...
 		YKScheduler();
 	}
 }
 
 void YKIdleTask(){
+	printString("Entering YKIdleTask...\n");
 	while(1){
-		printString("here\n");
 		YKEnterMutex();
 		YKIdleCount++;
 		YKExitMutex();
@@ -155,21 +157,30 @@ If ISR depth counter is zero, call scheduler function;
 void YKScheduler(void){
 	if(YKRdyList != YKCurrentTask){
 		YKCtxSwCount++;
-		YKCurrentTask = YKRdyList;
 		YKDispatcher();
 	}
 }
 
 //Begins or resumes execution of the next task
 void YKDispatcher(void){
-	printString("dispatcher\n");
+	printString("Entering dispatcher...\n");
 	asm_load_context();
 
+#ifdef 0
+	YKEnterMutex();
+	asm_save_context();
 
-/*
-Loads context of next task to be run by referencing the global TCB list;
-Call iret;
-*/
+	if(YKRdyList != YKCurrentTask){
+	YKCurrentTask = YKRdyList;
+	asm_load_context();
+	}	
+
+	else{
+	YKCurrentTask = YKRdyList;
+	YKExitMutex();
+	}
+#endif
+
 }
 
 

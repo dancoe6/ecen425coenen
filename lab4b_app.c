@@ -36,7 +36,7 @@ void ATask(void)
 
     printString("Creating low priority task B...\n");
     YKNewTask(BTask, (void *)&BStk[BSTACKSIZE], 7);
-
+	
     printString("Creating task C...\n");
     YKNewTask(CTask, (void *)&CStk[CSTACKSIZE], 2);
 

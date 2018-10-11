@@ -11,10 +11,10 @@ exit(0);
 
 void tickHandler(void){
 tick_count++;
-//printNewLine();
-//printString("TICK ");
-//printUInt(tick_count);
-//printNewLine();
+printNewLine();
+printString("TICK ");
+printUInt(tick_count);
+printNewLine();
 }
 
 

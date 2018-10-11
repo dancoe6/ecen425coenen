@@ -11,7 +11,7 @@ typedef struct taskblock
 {				/* the TCB struct definition */
     void *stackptr;		/* pointer to current top of stack */
 	int flags;
-	void* pc; 			/* program counter for the task */
+	void* ip; 			/* program counter for the task */
 
 	//store context in TCB struct
 	int ax;
