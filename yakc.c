@@ -9,7 +9,7 @@ int YKIdleCount = 0; //Global variable used by idle task
 int YKTickNum = 0; //Global variable incremented by tick handler
 
 TCBptr YKRdyList = 0;		/* a list of TCBs of all ready tasks in order of decreasing priority */ 
-TCBptr YKSuspList = 0;		/* tasks delayed or suspended */
+TCBptr YKDelayList = 0;		/* tasks delayed or suspended */
 TCBptr YKAvailTCBList = 0;		/* a list of available TCBs */
 TCB YKTCBArray[MAX_TASK_COUNT+1] = {0};	/* array to allocate all needed TCBs
 				   				(extra one is for the idle task) */
@@ -66,7 +66,8 @@ void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority){
 		YKRdyList = tmp;
 		tmp->next = NULL;
 		tmp->prev = NULL;
-    }else{			/* not first insertion */
+    }
+    else{			/* not first insertion */
 		tmp2 = YKRdyList;	/* insert in sorted ready list */
 		while (tmp2->priority < tmp->priority){
 			tmp2 = tmp2->next;	/* assumes idle task is at end */
@@ -94,7 +95,6 @@ void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority){
 	printInt(YKRdyList->next->next->next->priority);
 	printString("\n");
 	*/
-	YKExitMutex();
 	if(YKRunState){ // If YKRun has been called...
 		YKScheduler();
 	}
@@ -112,12 +112,45 @@ void YKIdleTask(){
 //Starts actual execution of user code
 void YKRun(void){
 	YKRunState = 1;
+    YKEnterMutex();
 	YKScheduler();
 }
 
 
 //Delays a task for specified number of clock ticks
 void YKDelayTask(unsigned count){
+    TCBptr tmp, tmp2;
+    YKEnterMutex();
+	printString("Entering YKDelayTask...\n");
+
+    tmp = YKCurrentTask;
+    YKRdyList = tmp->next; /* update the ready list (by removing the current task) */
+    tmp->next->prev = NULL;
+
+    if (YKDelayList == NULL){	/* is this first insertion? */
+		YKDelayList = tmp;
+		tmp->next = NULL;
+		tmp->prev = NULL;
+    }
+    else{			/* not first insertion */
+		tmp2 = YKDelayList;	/* insert in sorted delay list */
+		while (tmp2->priority < tmp->priority){
+			tmp2 = tmp2->next;	/* assumes idle task is at end */
+		}
+		if (tmp2->prev == NULL){	/* insert in list before tmp2 */
+			YKDelayList = tmp;
+			tmp->prev = NULL;
+			tmp->next = tmp2;
+			tmp2->prev = tmp;
+		}else{
+			tmp2->prev->next = tmp;
+			tmp->prev = tmp2->prev;
+			tmp->next = tmp2;
+			tmp2->prev = tmp;
+		}
+    }
+    YKScheduler();
+    
 /*
 Change the “state” field within the current task’s TCB to “delayed”;
 Change the “delay” field with the current task’s TCB to the argument “count”;
@@ -159,15 +192,13 @@ void YKScheduler(void){
 		YKCtxSwCount++;
 		YKDispatcher();
 	}
+	YKExitMutex();
 }
 
 //Begins or resumes execution of the next task
 void YKDispatcher(void){
 	printString("Entering dispatcher...\n");
-	asm_load_context();
 
-#ifdef 0
-	YKEnterMutex();
 	asm_save_context();
 
 	if(YKRdyList != YKCurrentTask){
@@ -175,12 +206,7 @@ void YKDispatcher(void){
 	asm_load_context();
 	}	
 
-	else{
-	YKCurrentTask = YKRdyList;
 	YKExitMutex();
-	}
-#endif
-
 }
 
 

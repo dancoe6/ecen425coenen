@@ -9,11 +9,9 @@ global asm_mutex
 global asm_unmutex
 
 asm_save_context:
+	pushf
 	mov	si, word [YKCurrentTask]
-	mov	[si], word sp
-	add si, 2
-	mov [si], word  0; pushing flags
-	add si, 2
+	add si, 6 			; skip sp, flags, and ip
 	mov	[si], word ax
 	add si, 2
 	mov	[si], word bx
@@ -22,7 +20,7 @@ asm_save_context:
 	add si, 2
 	mov	[si], word dx
 	add si, 2
-	mov	[si], word si
+	mov	[si], word 0
 	add si, 2
 	mov	[si], word di
 	add si, 2
@@ -31,7 +29,14 @@ asm_save_context:
 	mov	[si], word es
 	add si, 2
 	mov	[si], word ds
-	sub si, 18
+	sub si, 16
+	mov bp, sp 		;
+	mov di, [bp] 	; save flags
+	mov	[si], di 	; 
+	popf
+	sub si, 2
+	mov	[si], word sp
+	add si, 4
 	mov bp, sp 		;
 	mov di, [bp] 	; save ip
 	mov	[si], di 	; 
