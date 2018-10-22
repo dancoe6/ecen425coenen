@@ -8,7 +8,8 @@ void resetHandler(void){
 exit(0);
 }
 
-
+/*
+no longer need this
 void tickHandler(void){
 tick_count++;
 printNewLine();
@@ -16,6 +17,7 @@ printString("TICK ");
 printUInt(tick_count);
 printNewLine();
 }
+*/
 
 
 void keyboardHandler(void){

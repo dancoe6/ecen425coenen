@@ -70,7 +70,6 @@ void YKScheduler(void);
 //Begins or resumes execution of the next task
 void YKDispatcher(void);
 
-
 //The kernel's timer tick interrupt handler
 void YKTickHandler(void);
 

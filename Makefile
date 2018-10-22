@@ -16,7 +16,7 @@ intrpt.s: intrpt.c
 		c86 -g intrpt.i intrpt.s
 
 lab4c_app.s: lab4c_app.c
-		cpp lab4b_app.c lab4c_app.i
+		cpp lab4c_app.c lab4c_app.i
 		c86 -g lab4c_app.i lab4c_app.s
 
 clean:

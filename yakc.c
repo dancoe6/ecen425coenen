@@ -7,9 +7,10 @@
 int YKCtxSwCount = 0; //Global variable tracking context switches
 int YKIdleCount = 0; //Global variable used by idle task
 int YKTickNum = 0; //Global variable incremented by tick handler
+int YKISRDepth = 0;
 
 TCBptr YKRdyList = 0;		/* a list of TCBs of all ready tasks in order of decreasing priority */ 
-TCBptr YKDelayList = 0;		/* tasks delayed or suspended */
+TCBptr YKSuspList = 0;		/* tasks delayed or suspended */
 TCBptr YKAvailTCBList = 0;		/* a list of available TCBs */
 TCB YKTCBArray[MAX_TASK_COUNT+1] = {0};	/* array to allocate all needed TCBs
 				   				(extra one is for the idle task) */
@@ -124,21 +125,22 @@ void YKDelayTask(unsigned count){
 	printString("Entering YKDelayTask...\n");
 
     tmp = YKCurrentTask;
+	tmp->delay = count; //set delay counter to the count value passed in
     YKRdyList = tmp->next; /* update the ready list (by removing the current task) */
     tmp->next->prev = NULL;
 
-    if (YKDelayList == NULL){	/* is this first insertion? */
-		YKDelayList = tmp;
+    if (YKSuspList == NULL){	/* is this first insertion? */
+		YKSuspList = tmp;
 		tmp->next = NULL;
 		tmp->prev = NULL;
     }
     else{			/* not first insertion */
-		tmp2 = YKDelayList;	/* insert in sorted delay list */
+		tmp2 = YKSuspList;	/* insert in sorted delay list */
 		while (tmp2->priority < tmp->priority){
 			tmp2 = tmp2->next;	/* assumes idle task is at end */
 		}
 		if (tmp2->prev == NULL){	/* insert in list before tmp2 */
-			YKDelayList = tmp;
+			YKSuspList = tmp;
 			tmp->prev = NULL;
 			tmp->next = tmp2;
 			tmp2->prev = tmp;
@@ -172,8 +174,9 @@ void YKExitMutex(void){
 
 //Called on entry to ISR
 void YKEnterISR(void){
+	YKISRDepth++;
 /*
-If it is not a nested interrupt, context should be saved to the TCB
+??If it is not a nested interrupt, context should be saved to the TCB??
 Increment ISR depth counter;
 */
 }
@@ -184,6 +187,9 @@ void YKExitISR(void){
 Decrement ISR depth counter;
 If ISR depth counter is zero, call scheduler function;
 */
+	if(YKISRDepth == 0){
+		YKScheduler();
+	}
 }
 
 //Determines the highest priority ready task
@@ -212,6 +218,42 @@ void YKDispatcher(void){
 
 //The kernel's timer tick interrupt handler
 void YKTickHandler(void){
+	//YKTickNum++; this causes an error for some reason
+	TCBptr tmp, tmp2;
+	tmp = YKSuspList;
+	while(tmp != NULL){
+		tmp->delay--;
+		if(tmp->delay == 0){ //if it has reached zero, insert in YKRdyList
+			if (YKRdyList == NULL){	/* is this first insertion? */
+				YKRdyList = tmp;
+				tmp->next = NULL;
+				tmp->prev = NULL;
+			}else{			/* not first insertion */
+				tmp2 = YKRdyList;	/* insert in sorted ready list */
+				while (tmp2->priority < tmp->priority){
+					tmp2 = tmp2->next;	/* assumes idle task is at end */
+				}
+				if (tmp2->prev == NULL){	/* insert in list before tmp2 */
+					YKRdyList = tmp;
+					tmp->prev = NULL;
+					tmp->next = tmp2;
+					tmp2->prev = tmp;
+				}else{
+					tmp2->prev->next = tmp;
+					tmp->prev = tmp2->prev;
+					tmp->next = tmp2;
+					tmp2->prev = tmp;
+				}
+ 		   }
+			//and remove it from the YKSuspList
+			if(tmp->prev != NULL)
+				tmp->prev->next = tmp->next;
+			if(tmp->next != NULL)
+				tmp->next->prev = tmp->prev;
+		}
+	}
+	YKScheduler();
+
 /*
 Increment YKTickNum;
 Decrement all “delayed” tasks’ delay counter;
