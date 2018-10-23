@@ -12,6 +12,7 @@ reset_isr:
 	push cx
 	push dx
 	push si
+	push di
 	push bp
 	push es
 	push ds
@@ -23,6 +24,7 @@ reset_isr:
 	pop ds
 	pop es
 	pop bp
+	pop di
 	pop si
 	pop dx
 	pop cx
@@ -36,6 +38,7 @@ tick_isr:
 	push cx
 	push dx
 	push si
+	push di
 	push bp
 	push es
 	push ds
@@ -47,6 +50,7 @@ tick_isr:
 	pop ds
 	pop es
 	pop bp
+	pop di
 	pop si
 	pop dx
 	pop cx
@@ -60,6 +64,7 @@ keyboard_isr:
 	push cx
 	push dx
 	push si
+	push di
 	push bp
 	push es
 	push ds
@@ -71,6 +76,7 @@ keyboard_isr:
 	pop ds
 	pop es
 	pop bp
+	pop di
 	pop si
 	pop dx
 	pop cx

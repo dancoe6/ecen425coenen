@@ -16,8 +16,9 @@ TCB YKTCBArray[MAX_TASK_COUNT+1] = {0};	/* array to allocate all needed TCBs
 				   				(extra one is for the idle task) */
 int YKRunState = 0; // Flag to indicate if YKRun has been called
 TCBptr YKCurrentTask = 0; // 
-int IdleStk[IDLE_STACK_SIZE];
 void YKIdleTask(void);
+int IdleStk[IDLE_STACK_SIZE];
+
 
 extern void asm_save_context(void);
 extern void asm_load_context(void);
@@ -64,9 +65,9 @@ void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority){
 
 
 	if (YKRdyList == NULL){	/* is this first insertion? */
-		YKRdyList = tmp;
 		tmp->next = NULL;
 		tmp->prev = NULL;
+		YKRdyList = tmp;
     }
     else{			/* not first insertion */
 		tmp2 = YKRdyList;	/* insert in sorted ready list */
@@ -112,8 +113,8 @@ void YKIdleTask(){
 
 //Starts actual execution of user code
 void YKRun(void){
+	YKEnterMutex();
 	YKRunState = 1;
-    YKEnterMutex();
 	YKScheduler();
 }
 
@@ -211,8 +212,6 @@ void YKDispatcher(void){
 	YKCurrentTask = YKRdyList;
 	asm_load_context();
 	}	
-
-	YKExitMutex();
 }
 
 
