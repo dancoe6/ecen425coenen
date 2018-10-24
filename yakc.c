@@ -3,6 +3,7 @@
 #include "clib.h"
 
 #define NULL 0
+//#define DEBUG 0
 
 int YKCtxSwCount = 0; //Global variable tracking context switches
 int YKIdleCount = 0; //Global variable used by idle task
@@ -29,13 +30,15 @@ extern void asm_unmutex(void);
 void YKInitialize(void){
 	int i;
 	YKEnterMutex();
-	printString("Entering YKInitialize...\n");
+#ifdef DEBUG 
+printString("Entering YKInitialize...\n");
+#endif
     YKAvailTCBList = &(YKTCBArray[0]);
     for (i = 0; i < MAX_TASK_COUNT+1; i++)
 		YKTCBArray[i].next = &(YKTCBArray[i+1]);
     YKTCBArray[MAX_TASK_COUNT+1].next = NULL;
 	YKNewTask(YKIdleTask, (void *)&IdleStk[IDLE_STACK_SIZE], MAX_TASK_COUNT+1);
-	YKCurrentTask = YKRdyList; // Set the initial current task to the Idle task
+	//YKCurrentTask = YKRdyList; // Set the initial current task to the Idle task
 	YKExitMutex();
 }
 
@@ -43,7 +46,9 @@ void YKInitialize(void){
 void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority){
 	TCBptr tmp, tmp2;
 	YKEnterMutex();
+#ifdef DEBUG 
 	printString("Entering YKNewTask...\n");
+#endif
 
 	tmp = YKAvailTCBList;
     YKAvailTCBList = tmp->next;
@@ -103,7 +108,9 @@ void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority){
 }
 
 void YKIdleTask(){
+#ifdef DEBUG 
 	printString("Entering YKIdleTask...\n");
+#endif
 	while(1){
 		YKEnterMutex();
 		YKIdleCount++;
@@ -123,7 +130,9 @@ void YKRun(void){
 void YKDelayTask(unsigned count){
     TCBptr tmp, tmp2;
     YKEnterMutex();
+#ifdef DEBUG 
 	printString("Entering YKDelayTask...\n");
+#endif
 
     tmp = YKCurrentTask;
 	tmp->delay = count; //set delay counter to the count value passed in
@@ -204,7 +213,9 @@ void YKScheduler(void){
 
 //Begins or resumes execution of the next task
 void YKDispatcher(void){
+#ifdef DEBUG 
 	printString("Entering dispatcher...\n");
+#endif
 
 	asm_save_context();
 
@@ -217,47 +228,46 @@ void YKDispatcher(void){
 
 //The kernel's timer tick interrupt handler
 void YKTickHandler(void){
-	//YKTickNum++; this causes an error for some reason
 	TCBptr tmp, tmp2;
+
+#ifdef DEBUG 
+	printString("Entering YKTickHandler...\n");
+#endif
+
+	YKTickNum++; //this causes an error for some reason
 	tmp = YKSuspList;
-	while(tmp != NULL){
-		tmp->delay--;
-		if(tmp->delay == 0){ //if it has reached zero, insert in YKRdyList
-			if (YKRdyList == NULL){	/* is this first insertion? */
+	
+	tmp->delay--;
+	if(tmp->delay == 0){ //if it has reached zero, insert in YKRdyList
+		if (YKRdyList == NULL){	/* is this first insertion? */
+			YKRdyList = tmp;
+			tmp->next = NULL;
+			tmp->prev = NULL;
+		}else{			/* not first insertion */
+			tmp2 = YKRdyList;	/* insert in sorted ready list */
+			while (tmp2->priority < tmp->priority){
+				tmp2 = tmp2->next;	/* assumes idle task is at end */
+			}
+			if (tmp2->prev == NULL){	/* insert in list before tmp2 */
 				YKRdyList = tmp;
-				tmp->next = NULL;
 				tmp->prev = NULL;
-			}else{			/* not first insertion */
-				tmp2 = YKRdyList;	/* insert in sorted ready list */
-				while (tmp2->priority < tmp->priority){
-					tmp2 = tmp2->next;	/* assumes idle task is at end */
-				}
-				if (tmp2->prev == NULL){	/* insert in list before tmp2 */
-					YKRdyList = tmp;
-					tmp->prev = NULL;
-					tmp->next = tmp2;
-					tmp2->prev = tmp;
-				}else{
-					tmp2->prev->next = tmp;
-					tmp->prev = tmp2->prev;
-					tmp->next = tmp2;
-					tmp2->prev = tmp;
-				}
- 		   }
-			//and remove it from the YKSuspList
-			if(tmp->prev != NULL)
-				tmp->prev->next = tmp->next;
-			if(tmp->next != NULL)
-				tmp->next->prev = tmp->prev;
+				tmp->next = tmp2;
+				tmp2->prev = tmp;
+			}else{
+				tmp2->prev->next = tmp;
+				tmp->prev = tmp2->prev;
+				tmp->next = tmp2;
+				tmp2->prev = tmp;
+			}
+ 		}
+		//and remove it from the YKSuspList
+		if(tmp->prev != NULL)
+			tmp->prev->next = tmp->next;
+		if(tmp->next != NULL)
+			tmp->next->prev = tmp->prev;
 		}
-	}
+
 	YKScheduler();
 
-/*
-Increment YKTickNum;
-Decrement all “delayed” tasks’ delay counter;
-If any task delay counter reaches zero, update that task to “ready”;
-Call scheduler function;
-*/
 }
 

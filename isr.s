@@ -43,6 +43,7 @@ tick_isr:
 	push es
 	push ds
 	sti
+	call tickHandler
 	call YKTickHandler
 	cli
 	mov	al, 0x20	; Load nonspecific EOI value (0x20) into register al
