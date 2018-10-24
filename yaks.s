@@ -29,13 +29,13 @@ asm_save_context:
 	mov	[si], word es
 	add si, 2
 	mov	[si], word ds
-	sub si, 16
+	sub si, 20
 	mov bp, sp 		;
 	mov di, [bp] 	; save flags
 	mov	[si], di 	; 
 	popf
-	sub si, 2
-	mov	[si], word sp
+	sub si, 2			;
+	mov	[si], word sp	; save sp
 	add si, 4
 	mov bp, sp 		;
 	mov di, [bp] 	; save ip
@@ -47,10 +47,10 @@ asm_load_context:
 	mov	si, word [YKRdyList]
 	mov	sp, word [si]
 	add si, 2
-	push word [si] ; pushing old ip
-	add si, 2
-	push cs ;make sure to change this
 	push word [si] ; pushing flags
+	push cs ; pushing cs
+	add si, 2
+	push word [si] ; pushing ip to be restored
 	add si, 2
 	mov	ax, word [si]
 	add si, 2
