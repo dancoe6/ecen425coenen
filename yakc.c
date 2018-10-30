@@ -38,7 +38,6 @@ printString("Entering YKInitialize...\n");
 		YKTCBArray[i].next = &(YKTCBArray[i+1]);
     YKTCBArray[MAX_TASK_COUNT+1].next = NULL;
 	YKNewTask(YKIdleTask, (void *)&IdleStk[IDLE_STACK_SIZE], MAX_TASK_COUNT+1);
-	//YKCurrentTask = YKRdyList; // Set the initial current task to the Idle task
 	YKExitMutex();
 }
 
@@ -53,6 +52,7 @@ void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority){
 	tmp = YKAvailTCBList;
     YKAvailTCBList = tmp->next;
 	tmp->stackptr = taskStack;
+	tmp->flags = 512;
 	tmp->ip = task;
 	tmp->ax = 0;
 	tmp->bx = 0;
@@ -63,7 +63,6 @@ void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority){
 	tmp->bp = 0;
 	tmp->es = 0;
 	tmp->ds = 0;
-	tmp->flags = 512;
 	tmp->state = running;
 	tmp->priority = priority;
 	tmp->delay = 0;
@@ -92,16 +91,6 @@ void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority){
 		}
     }
 
-	/*
-	printInt(YKRdyList->priority);
-	printString("\n");
-	printInt(YKRdyList->next->priority);
-	printString("\n");
-	printInt(YKRdyList->next->next->priority);
-	printString("\n");
-	printInt(YKRdyList->next->next->next->priority);
-	printString("\n");
-	*/
 	if(YKRunState){ // If YKRun has been called...
 		YKScheduler();
 	}
@@ -216,9 +205,9 @@ void YKDispatcher(void){
 #ifdef DEBUG 
 	printString("Entering dispatcher...\n");
 #endif
-
-	asm_save_context();
-
+	if(YKCurrentTask != 0){
+		asm_save_context();
+	}
 	if(YKRdyList != YKCurrentTask){
 	YKCurrentTask = YKRdyList;
 	asm_load_context();
@@ -234,11 +223,12 @@ void YKTickHandler(void){
 	printString("Entering YKTickHandler...\n");
 #endif
 
-	YKTickNum++; //this causes an error for some reason
+	YKTickNum++;
 	tmp = YKSuspList;
 	
 	tmp->delay--;
 	if(tmp->delay == 0){ //if it has reached zero, insert in YKRdyList
+		YKEnterMutex();
 		if (YKRdyList == NULL){	/* is this first insertion? */
 			YKRdyList = tmp;
 			tmp->next = NULL;
@@ -265,9 +255,9 @@ void YKTickHandler(void){
 			tmp->prev->next = tmp->next;
 		if(tmp->next != NULL)
 			tmp->next->prev = tmp->prev;
-		}
+		YKScheduler();
+	}
 
-	YKScheduler();
 
 }
 
