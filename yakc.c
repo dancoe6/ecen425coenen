@@ -19,7 +19,7 @@ int YKRunState = 0; // Flag to indicate if YKRun has been called
 TCBptr YKCurrentTask = 0; // 
 void YKIdleTask(void);
 int IdleStk[IDLE_STACK_SIZE];
-
+int YKSuspCnt = 0;
 
 extern void asm_save_context(void);
 extern void asm_load_context(void);
@@ -94,6 +94,7 @@ void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority){
 	if(YKRunState){ // If YKRun has been called...
 		YKScheduler();
 	}
+	YKExitMutex();
 }
 
 void YKIdleTask(){
@@ -118,38 +119,67 @@ void YKRun(void){
 //Delays a task for specified number of clock ticks
 void YKDelayTask(unsigned count){
     TCBptr tmp, tmp2;
+	int i, c;
     YKEnterMutex();
 #ifdef DEBUG 
 	printString("Entering YKDelayTask...\n");
 #endif
-
+	YKSuspCnt++;
+	c = YKSuspCnt;
     tmp = YKCurrentTask;
 	tmp->delay = count; //set delay counter to the count value passed in
     YKRdyList = tmp->next; /* update the ready list (by removing the current task) */
     tmp->next->prev = NULL;
 
+	//printInt(tmp->delay);
+	//printNewLine();
+
     if (YKSuspList == NULL){	/* is this first insertion? */
-		YKSuspList = tmp;
 		tmp->next = NULL;
 		tmp->prev = NULL;
+		YKSuspList = tmp;
     }
     else{			/* not first insertion */
-		tmp2 = YKSuspList;	/* insert in sorted delay list */
-		while (tmp2->priority < tmp->priority){
-			tmp2 = tmp2->next;	/* assumes idle task is at end */
+	/* insert in sorted delay list */
+		tmp2 = YKSuspList;
+		while (tmp2->priority < tmp->priority && tmp2->next != NULL){	
+			tmp2 = tmp2->next;
 		}
-		if (tmp2->prev == NULL){	/* insert in list before tmp2 */
+		if (tmp2->next == NULL){
+			//printString("one\n");
+			tmp2->next = tmp;
+			tmp->prev = tmp2;
+			tmp->next = NULL;
+		}
+		else if (tmp2->prev == NULL){	/* insert in list before tmp2 */
+		//printString("two\n");
 			YKSuspList = tmp;
 			tmp->prev = NULL;
 			tmp->next = tmp2;
 			tmp2->prev = tmp;
-		}else{
+		}
+		else{
+		//printString("three\n");
+		//printInt(tmp2->delay);
 			tmp2->prev->next = tmp;
+//printInt(tmp2->prev->next->delay);
 			tmp->prev = tmp2->prev;
+//printInt(tmp->prev->delay);
 			tmp->next = tmp2;
+//printInt(tmp->next->delay);
 			tmp2->prev = tmp;
+//printInt(tmp2->prev->delay);
 		}
     }
+/*
+	tmp = YKSuspList;
+	printString("SuspList after YKdelay sort\n");
+	for (i = 0; i < c; i++){
+		printInt(tmp->delay);
+		printNewLine();
+		tmp = tmp->next;
+	}*/
+
     YKScheduler();
     
 /*
@@ -208,6 +238,7 @@ void YKDispatcher(void){
 	if(YKCurrentTask != 0){
 		asm_save_context();
 	}
+
 	if(YKRdyList != YKCurrentTask){
 	YKCurrentTask = YKRdyList;
 	asm_load_context();
@@ -217,47 +248,131 @@ void YKDispatcher(void){
 
 //The kernel's timer tick interrupt handler
 void YKTickHandler(void){
-	TCBptr tmp, tmp2;
+	TCBptr tmp, tmp2, tmp3;
+	int i, c;
+	c = YKSuspCnt;
 
 #ifdef DEBUG 
 	printString("Entering YKTickHandler...\n");
+	printNewLine();
 #endif
-
+	
+	YKEnterMutex();
 	YKTickNum++;
 	tmp = YKSuspList;
-	
-	tmp->delay--;
-	if(tmp->delay == 0){ //if it has reached zero, insert in YKRdyList
-		YKEnterMutex();
-		if (YKRdyList == NULL){	/* is this first insertion? */
-			YKRdyList = tmp;
-			tmp->next = NULL;
-			tmp->prev = NULL;
-		}else{			/* not first insertion */
-			tmp2 = YKRdyList;	/* insert in sorted ready list */
-			while (tmp2->priority < tmp->priority){
-				tmp2 = tmp2->next;	/* assumes idle task is at end */
+	for (i = 0; i < c; i++){
+		if(tmp->delay > 0)
+			tmp->delay--;
+		tmp = tmp->next;
+
+	}
+/*
+	tmp = YKSuspList;
+	printString("SuspList before YKTick sort\n");
+	for (i = 0; i < c; i++){
+		printInt(tmp->delay);
+		printNewLine();
+		tmp = tmp->next;
+	}*/
+
+	tmp = YKSuspList;
+	for (i = 0; i < c; i++){
+
+		
+		if(tmp->delay == 0){ //if it has reached zero, insert in YKRdyList
+
+			//printInt(YKSuspList->priority);
+			//printInt(tmp->next->delay);
+		
+				
+			if (tmp->prev == NULL){ //if the top of the delay list is ready
+				YKSuspList = tmp->next;
+				YKSuspList->prev = tmp->prev;
 			}
-			if (tmp2->prev == NULL){	/* insert in list before tmp2 */
+			else{
+				tmp->prev->next = tmp->next;
+				tmp->next->prev = tmp->prev;
+			}
+			
+
+			//add it to the YKRdyList
+			tmp2 = YKRdyList;	
+			while (tmp2->priority < tmp->priority){
+				tmp2 = tmp2->next;	//assumes idle task is at end 
+			}
+			if (tmp2->prev == NULL){	// insert in list before tmp2
 				YKRdyList = tmp;
 				tmp->prev = NULL;
 				tmp->next = tmp2;
 				tmp2->prev = tmp;
-			}else{
+			}
+			else{
 				tmp2->prev->next = tmp;
 				tmp->prev = tmp2->prev;
 				tmp->next = tmp2;
 				tmp2->prev = tmp;
 			}
- 		}
-		//and remove it from the YKSuspList
-		if(tmp->prev != NULL)
-			tmp->prev->next = tmp->next;
-		if(tmp->next != NULL)
-			tmp->next->prev = tmp->prev;
-		YKScheduler();
+			YKSuspCnt--;
+			break;
+		}
+		tmp = tmp->next;
 	}
+/*
+	c = YKSuspCnt;
+	tmp = YKSuspList;
+	printString("SuspList after YKTick sort\n");
+	//printInt(tmp->prev->priority);
+	for (i = 0; i < c; i++){
+		printInt(tmp->delay);
+		printNewLine();
+		tmp = tmp->next;
+	}
+*/
 
+	YKScheduler();
 
 }
+
+
+
+
+
+
+
+/*
+
+
+
+
+
+
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
