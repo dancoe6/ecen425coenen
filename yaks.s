@@ -7,6 +7,7 @@ global asm_save_context
 global asm_load_context
 global asm_mutex
 global asm_unmutex
+global asm_idle_task
 
 asm_save_context:
 	pushf
@@ -78,6 +79,12 @@ asm_mutex:
 asm_unmutex:
 	sti
 	ret
+
+asm_idle_task:
+	cli
+	inc word [YKIdleCount]
+	sti
+	jmp asm_idle_task
 
 	
 

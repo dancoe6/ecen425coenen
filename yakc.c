@@ -25,6 +25,7 @@ extern void asm_save_context(void);
 extern void asm_load_context(void);
 extern void asm_mutex(void);
 extern void asm_unmutex(void);
+extern void asm_idle_task(void);
 
 //Initializes all required kernel data structures
 void YKInitialize(void){
@@ -101,11 +102,12 @@ void YKIdleTask(){
 #ifdef DEBUG 
 	printString("Entering YKIdleTask...\n");
 #endif
-	while(1){
+/*	while(1){
 		YKEnterMutex();
 		YKIdleCount++;
 		YKExitMutex();
-	}
+	}*/
+	asm_idle_task();
 }
 
 //Starts actual execution of user code
@@ -131,9 +133,6 @@ void YKDelayTask(unsigned count){
     YKRdyList = tmp->next; /* update the ready list (by removing the current task) */
     tmp->next->prev = NULL;
 
-	//printInt(tmp->delay);
-	//printNewLine();
-
     if (YKSuspList == NULL){	/* is this first insertion? */
 		tmp->next = NULL;
 		tmp->prev = NULL;
@@ -146,29 +145,22 @@ void YKDelayTask(unsigned count){
 			tmp2 = tmp2->next;
 		}
 		if (tmp2->next == NULL){
-			//printString("one\n");
 			tmp2->next = tmp;
 			tmp->prev = tmp2;
 			tmp->next = NULL;
 		}
 		else if (tmp2->prev == NULL){	/* insert in list before tmp2 */
-		//printString("two\n");
 			YKSuspList = tmp;
 			tmp->prev = NULL;
 			tmp->next = tmp2;
 			tmp2->prev = tmp;
 		}
 		else{
-		//printString("three\n");
-		//printInt(tmp2->delay);
+
 			tmp2->prev->next = tmp;
-//printInt(tmp2->prev->next->delay);
 			tmp->prev = tmp2->prev;
-//printInt(tmp->prev->delay);
 			tmp->next = tmp2;
-//printInt(tmp->next->delay);
 			tmp2->prev = tmp;
-//printInt(tmp2->prev->delay);
 		}
     }
 /*
@@ -192,12 +184,15 @@ Call the scheduler function;
 
 //Disables interrupts, written in assembly
 void YKEnterMutex(void){
+	
 	asm_mutex();
 }
 
 //Enables interrupts
 void YKExitMutex(void){
-	asm_unmutex();
+	if(YKRunState){ // If YKRun has been called...
+		asm_unmutex();
+	}
 }
 
 
@@ -235,14 +230,14 @@ void YKDispatcher(void){
 #ifdef DEBUG 
 	printString("Entering dispatcher...\n");
 #endif
-	if(YKCurrentTask != 0){
+	if(YKCurrentTask != 0){//don't save context on first call
 		asm_save_context();
 	}
 
 	if(YKRdyList != YKCurrentTask){
-	YKCurrentTask = YKRdyList;
-	asm_load_context();
-	}	
+		YKCurrentTask = YKRdyList;
+		asm_load_context();
+	}
 }
 
 
