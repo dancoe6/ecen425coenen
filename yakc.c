@@ -251,6 +251,17 @@ void YKTickHandler(void){
 	printString("Entering YKTickHandler...\n");
 	printNewLine();
 #endif
+#ifdef DEBUG 
+	tmp = YKSuspList;
+	printString("SuspList before YKTick\n");
+	for (i = 0; i < c; i++){
+		printInt(tmp->priority);
+		printString(" - ");
+		printInt(tmp->delay);
+		printNewLine();
+		tmp = tmp->next;
+	}
+#endif
 	
 	YKEnterMutex();
 	YKTickNum++;
@@ -261,14 +272,7 @@ void YKTickHandler(void){
 		tmp = tmp->next;
 
 	}
-/*
-	tmp = YKSuspList;
-	printString("SuspList before YKTick sort\n");
-	for (i = 0; i < c; i++){
-		printInt(tmp->delay);
-		printNewLine();
-		tmp = tmp->next;
-	}*/
+
 
 	tmp = YKSuspList;
 	for (i = 0; i < c; i++){
@@ -279,7 +283,7 @@ void YKTickHandler(void){
 			//printInt(YKSuspList->priority);
 			//printInt(tmp->next->delay);
 		
-				
+			tmp3 = tmp->next;
 			if (tmp->prev == NULL){ //if the top of the delay list is ready
 				YKSuspList = tmp->next;
 				YKSuspList->prev = tmp->prev;
@@ -308,21 +312,24 @@ void YKTickHandler(void){
 				tmp2->prev = tmp;
 			}
 			YKSuspCnt--;
-			break;
+			tmp = tmp3;
+			//break;
 		}
-		tmp = tmp->next;
+		else
+			tmp = tmp->next;
 	}
-/*
+#ifdef DEBUG 
 	c = YKSuspCnt;
 	tmp = YKSuspList;
-	printString("SuspList after YKTick sort\n");
-	//printInt(tmp->prev->priority);
+	printString("SuspList after YKTick\n");
 	for (i = 0; i < c; i++){
+		printInt(tmp->priority);
+		printString(" - ");
 		printInt(tmp->delay);
 		printNewLine();
 		tmp = tmp->next;
 	}
-*/
+#endif
 
 	YKScheduler();
 
