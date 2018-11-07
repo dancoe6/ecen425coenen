@@ -3,7 +3,7 @@
 #include "clib.h"
 
 #define NULL 0
-//#define DEBUG 0
+#define DEBUG 0
 
 int YKCtxSwCount = 0; //Global variable tracking context switches
 int YKIdleCount = 0; //Global variable used by idle task
@@ -67,6 +67,7 @@ void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority){
 	tmp->state = running;
 	tmp->priority = priority;
 	tmp->delay = 0;
+	tmp->pending = NULL;
 
 
 	if (YKRdyList == NULL){	/* is this first insertion? */
@@ -342,6 +343,10 @@ semptr YKSemCreate(int initialValue){
 	semptr temp;
 
 	temp->value = initialValue;
+	#ifdef DEBUG
+	printString("Semaphore created");
+	printNewLine();
+	#endif
 	return temp;
 }
 
@@ -349,6 +354,11 @@ semptr YKSemCreate(int initialValue){
 void YKSemPost(semptr semaphore){
 	int c, i, first;
 	TCBptr tmp, tmp2,topPriority;
+	#ifdef DEBUG
+	printString("posting ");
+	printInt(semaphore);
+	printNewLine();
+	#endif
 	first = 1;
 	c = YKSuspCnt;
 	YKEnterMutex();
@@ -388,14 +398,20 @@ void YKSemPost(semptr semaphore){
 	}
 	YKSuspCnt--;
 
-	//if not in isr!!
-	YKScheduler();
+	if(YKISRDepth == 0){
+		YKScheduler();
+	}
 	YKExitMutex();
 }
 
 //pend on a semaphore that is passed in
 void YKSemPend(semptr semaphore){
 	TCBptr tmp;
+	#ifdef DEBUG
+	printString("pending ");
+	printInt(semaphore);
+	printNewLine();
+	#endif
 	YKEnterMutex();
 	if(semaphore->value > 0){
 		semaphore->value--;
