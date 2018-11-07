@@ -7,7 +7,7 @@ extern int YKTickNum; //Global variable incremented by tick handler
 
 enum taskState{ running, ready, delayed, suspended};
 typedef struct taskblock *TCBptr;
-typedef struct YKSEM* semptr;
+typedef struct semaphore* semptr;
 typedef struct taskblock
 {				/* the TCB struct definition */
     void *stackptr;		/* pointer to current top of stack */
@@ -41,9 +41,9 @@ extern TCB    YKTCBArray[MAX_TASK_COUNT+1];	/* array to allocate all needed TCBs
 
 //semaphore structures
 
-typedef struct YKSEM{
+typedef struct semaphore{
   int value;
-}semaphore;
+}YKSEM;
 
 
 //Initializes all required kernel data structures

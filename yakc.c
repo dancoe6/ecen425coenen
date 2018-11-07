@@ -342,14 +342,14 @@ semptr YKSemCreate(int initialValue){
 	semptr temp;
 
 	temp->value = initialValue;
-	return &temp;
+	return temp;
 }
 
 //post to the semaphore passed in
 void YKSemPost(semptr semaphore){
-	int c, i;
-	TCBptr tmp, tmp2,topPriority, flag;
-	flag = 1;
+	int c, i, first;
+	TCBptr tmp, tmp2,topPriority;
+	first = 1;
 	c = YKSuspCnt;
 	YKEnterMutex();
 	if(semaphore->value++ >= 0){
@@ -395,8 +395,8 @@ void YKSemPost(semptr semaphore){
 
 //pend on a semaphore that is passed in
 void YKSemPend(semptr semaphore){
-	YKEnterMutex();
 	TCBptr tmp;
+	YKEnterMutex();
 	if(semaphore->value > 0){
 		semaphore->value--;
 		YKExitMutex();
