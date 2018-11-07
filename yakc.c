@@ -10,13 +10,13 @@ int YKIdleCount = 0; //Global variable used by idle task
 int YKTickNum = 0; //Global variable incremented by tick handler
 int YKISRDepth = 0;
 
-TCBptr YKRdyList = 0;		/* a list of TCBs of all ready tasks in order of decreasing priority */ 
+TCBptr YKRdyList = 0;		/* a list of TCBs of all ready tasks in order of decreasing priority */
 TCBptr YKSuspList = 0;		/* tasks delayed or suspended */
 TCBptr YKAvailTCBList = 0;		/* a list of available TCBs */
 TCB YKTCBArray[MAX_TASK_COUNT+1] = {0};	/* array to allocate all needed TCBs
 				   				(extra one is for the idle task) */
 int YKRunState = 0; // Flag to indicate if YKRun has been called
-TCBptr YKCurrentTask = 0; // 
+TCBptr YKCurrentTask = 0; //
 void YKIdleTask(void);
 int IdleStk[IDLE_STACK_SIZE];
 int YKSuspCnt = 0;
@@ -31,7 +31,7 @@ extern void asm_idle_task(void);
 void YKInitialize(void){
 	int i;
 	YKEnterMutex();
-#ifdef DEBUG 
+#ifdef DEBUG
 printString("Entering YKInitialize...\n");
 #endif
     YKAvailTCBList = &(YKTCBArray[0]);
@@ -46,7 +46,7 @@ printString("Entering YKInitialize...\n");
 void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority){
 	TCBptr tmp, tmp2;
 	YKEnterMutex();
-#ifdef DEBUG 
+#ifdef DEBUG
 	printString("Entering YKNewTask...\n");
 #endif
 
@@ -99,7 +99,7 @@ void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority){
 }
 
 void YKIdleTask(){
-#ifdef DEBUG 
+#ifdef DEBUG
 	printString("Entering YKIdleTask...\n");
 #endif
 /*	while(1){
@@ -123,7 +123,7 @@ void YKDelayTask(unsigned count){
     TCBptr tmp, tmp2;
 	int i, c;
     YKEnterMutex();
-#ifdef DEBUG 
+#ifdef DEBUG
 	printString("Entering YKDelayTask...\n");
 #endif
 	YKSuspCnt++;
@@ -141,7 +141,7 @@ void YKDelayTask(unsigned count){
     else{			/* not first insertion */
 	/* insert in sorted delay list */
 		tmp2 = YKSuspList;
-		while (tmp2->priority < tmp->priority && tmp2->next != NULL){	
+		while (tmp2->priority < tmp->priority && tmp2->next != NULL){
 			tmp2 = tmp2->next;
 		}
 		if (tmp2->next == NULL){
@@ -173,7 +173,7 @@ void YKDelayTask(unsigned count){
 	}*/
 
     YKScheduler();
-    
+
 /*
 Change the “state” field within the current task’s TCB to “delayed”;
 Change the “delay” field with the current task’s TCB to the argument “count”;
@@ -184,7 +184,7 @@ Call the scheduler function;
 
 //Disables interrupts, written in assembly
 void YKEnterMutex(void){
-	
+
 	asm_mutex();
 }
 
@@ -227,7 +227,7 @@ void YKScheduler(void){
 
 //Begins or resumes execution of the next task
 void YKDispatcher(void){
-#ifdef DEBUG 
+#ifdef DEBUG
 	printString("Entering dispatcher...\n");
 #endif
 	if(YKCurrentTask != 0){//don't save context on first call
@@ -247,11 +247,11 @@ void YKTickHandler(void){
 	int i, c;
 	c = YKSuspCnt;
 
-#ifdef DEBUG 
+#ifdef DEBUG
 	printString("Entering YKTickHandler...\n");
 	printNewLine();
 #endif
-#ifdef DEBUG 
+#ifdef DEBUG
 	tmp = YKSuspList;
 	printString("SuspList before YKTick\n");
 	for (i = 0; i < c; i++){
@@ -262,7 +262,7 @@ void YKTickHandler(void){
 		tmp = tmp->next;
 	}
 #endif
-	
+
 	YKEnterMutex();
 	YKTickNum++;
 	tmp = YKSuspList;
@@ -277,12 +277,12 @@ void YKTickHandler(void){
 	tmp = YKSuspList;
 	for (i = 0; i < c; i++){
 
-		
+
 		if(tmp->delay == 0){ //if it has reached zero, insert in YKRdyList
 
 			//printInt(YKSuspList->priority);
 			//printInt(tmp->next->delay);
-		
+
 			tmp3 = tmp->next;
 			if (tmp->prev == NULL){ //if the top of the delay list is ready
 				YKSuspList = tmp->next;
@@ -292,12 +292,12 @@ void YKTickHandler(void){
 				tmp->prev->next = tmp->next;
 				tmp->next->prev = tmp->prev;
 			}
-			
+
 
 			//add it to the YKRdyList
-			tmp2 = YKRdyList;	
+			tmp2 = YKRdyList;
 			while (tmp2->priority < tmp->priority){
-				tmp2 = tmp2->next;	//assumes idle task is at end 
+				tmp2 = tmp2->next;	//assumes idle task is at end
 			}
 			if (tmp2->prev == NULL){	// insert in list before tmp2
 				YKRdyList = tmp;
@@ -318,7 +318,7 @@ void YKTickHandler(void){
 		else
 			tmp = tmp->next;
 	}
-#ifdef DEBUG 
+#ifdef DEBUG
 	c = YKSuspCnt;
 	tmp = YKSuspList;
 	printString("SuspList after YKTick\n");
@@ -336,45 +336,87 @@ void YKTickHandler(void){
 }
 
 
+//Creates and initializes a semaphore
+//must be called exactly once and before post or pend to that semaphore
+semptr YKSemCreate(int initialValue){
+	semptr temp;
 
+	temp->value = initialValue;
+	return &temp;
+}
 
+//post to the semaphore passed in
+void YKSemPost(semptr semaphore){
+	int c, i;
+	TCBptr tmp, tmp2,topPriority, flag;
+	flag = 1;
+	c = YKSuspCnt;
+	YKEnterMutex();
+	if(semaphore->value++ >= 0){
+		YKExitMutex();
+		return;
+	}
+	tmp = YKSuspList;
+	for(i = 0;i< c;i++){//go through each suspended task
+		if(tmp->pending == semaphore){ //if this task is waiting on given semaphore
+			if(first){ //if first found
+				topPriority = tmp;
+				first = 0; //lower flag
+			}
+			if(tmp->priority < topPriority->priority){ //if this task has highest priority so far
+				topPriority = tmp;
+			}
+		}
+	}
+	tmp = topPriority;
+	//add unsuspended task to the YKRdyList
+	tmp2 = YKRdyList;
+	while (tmp2->priority < tmp->priority){
+		tmp2 = tmp2->next;	//assumes idle task is at end
+	}
+	if (tmp2->prev == NULL){	// insert in list before tmp2
+		YKRdyList = tmp;
+		tmp->prev = NULL;
+		tmp->next = tmp2;
+		tmp2->prev = tmp;
+	}
+	else{
+		tmp2->prev->next = tmp;
+		tmp->prev = tmp2->prev;
+		tmp->next = tmp2;
+		tmp2->prev = tmp;
+	}
+	YKSuspCnt--;
 
+	//if not in isr!!
+	YKScheduler();
+	YKExitMutex();
+}
 
+//pend on a semaphore that is passed in
+void YKSemPend(semptr semaphore){
+	YKEnterMutex();
+	TCBptr tmp;
+	if(semaphore->value > 0){
+		semaphore->value--;
+		YKExitMutex();
+		return;
+	}else{
+		semaphore->value--;
 
-/*
+		YKSuspCnt++;
+		tmp = YKCurrentTask;
+		tmp->pending = semaphore;
+		YKRdyList = tmp->next; /* update the ready list (by removing the current task) */
+		tmp->next->prev = NULL;
 
-
-
-
-
-
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+		if (YKSuspList == NULL){	/* is this first insertion? */
+			tmp->next = NULL;
+		}else{			/* not first insertion */
+			tmp->next = YKSuspList;
+		}
+		tmp->prev = NULL;
+		YKSuspList = tmp;
+		YKScheduler();
+	}
+}

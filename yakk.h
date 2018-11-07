@@ -7,6 +7,7 @@ extern int YKTickNum; //Global variable incremented by tick handler
 
 enum taskState{ running, ready, delayed, suspended};
 typedef struct taskblock *TCBptr;
+typedef struct YKSEM* semptr;
 typedef struct taskblock
 {				/* the TCB struct definition */
     void *stackptr;		/* pointer to current top of stack */
@@ -28,21 +29,29 @@ typedef struct taskblock
     int delay;			/* #ticks yet to wait */
     TCBptr next;		/* forward ptr for dbl linked list */
     TCBptr prev;		/* backward ptr for dbl linked list */
+    semptr pending; /*semaphore that task is waiting for*/
 }  TCB;
 
 extern TCBptr YKRdyList;		/* a list of TCBs of all ready tasks
-						  in order of decreasing priority */ 
+						  in order of decreasing priority */
 extern TCBptr YKSuspList;		/* tasks delayed or suspended */
 extern TCBptr YKAvailTCBList;		/* a list of available TCBs */
 extern TCB    YKTCBArray[MAX_TASK_COUNT+1];	/* array to allocate all needed TCBs
 				   (extra one is for the idle task) */
+
+//semaphore structures
+
+typedef struct YKSEM{
+  int value;
+}semaphore;
+
 
 //Initializes all required kernel data structures
 void YKInitialize(void);
 
 //Creates a new task
 void YKNewTask(void (* task)(void), void *taskStack, unsigned char priority);
- 
+
 
 //Starts actual execution of user code
 void YKRun(void);
@@ -73,3 +82,12 @@ void YKDispatcher(void);
 //The kernel's timer tick interrupt handler
 void YKTickHandler(void);
 
+//Creates and initializes a semaphore
+//must be called exactly once and before post or pend to that semaphore
+semptr YKSemCreate(int initialValue);
+
+//post to the semaphore passed in
+void YKSemPost(semptr semaphore);
+
+//pend on a semaphore that is passed in
+void YKSemPend(semptr semaphore);

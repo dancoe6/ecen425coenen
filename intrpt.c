@@ -26,13 +26,17 @@ printNewLine();
 printString("DELAY KEY PRESSED");
 	while(delay < 5000){
 		delay++;
-}
+	}
 printNewLine();
 printString("DELAY COMPLETE");
 printNewLine();
 }
 
-else{
+else if(KeyBuffer == 'p'){
+	printString("p key pressed, need to uncomment yksempost");
+	printNewLine();
+	//YKSemPost(NSemPtr);
+}else{
 printNewLine();
 printString("KEYPRESS (");
 printChar(KeyBuffer);
