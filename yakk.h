@@ -43,7 +43,8 @@ extern TCB    YKTCBArray[MAX_TASK_COUNT+1];	/* array to allocate all needed TCBs
 
 typedef struct semaphore{
   int value;
-}YKSEM;
+  int id;
+} YKSEM;
 
 
 //Initializes all required kernel data structures
