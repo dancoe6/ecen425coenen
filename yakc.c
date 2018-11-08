@@ -352,8 +352,8 @@ void YKTickHandler(void){
 //Creates and initializes a semaphore
 //must be called exactly once and before post or pend to that semaphore
 semptr YKSemCreate(int initialValue){
-	semptr temp;
 	static int YKSemCnt;
+	semptr temp;
 
 	temp->value = initialValue;
 	temp->id = YKSemCnt;
@@ -367,7 +367,7 @@ semptr YKSemCreate(int initialValue){
 }
 
 //post to the semaphore passed in
-void YKSemPost(semptr semaphore){
+void YKSemPost(semptr sem){
 	int c, i, first;
 	TCBptr tmp, tmp2,topPriority;
 	YKEnterMutex();
@@ -385,19 +385,19 @@ void YKSemPost(semptr semaphore){
 	}
 	printNewLine();
 	printString("Semaphore being posted is ");
-	printInt(semaphore->id);
+	printInt(sem->id);
 	printNewLine();
 	#endif
 
 	first = 1;
-	semaphore->value++;
-	if(semaphore->value == 0){
+	sem->value++;
+	if(sem->value == 0){
 		YKExitMutex();
 		return;
 	}
 	tmp = YKSuspList;
 	while(tmp != NULL){//go through each suspended tasks to find if one is pending this semaphore
-		if(tmp->pending->id == semaphore->id){ //if this task is pending on given semaphore
+		if(tmp->pending->id == sem->id){ //if this task is pending on given semaphore
 			#ifdef DEBUG
 			printString("One pending task priority is ");
 			printInt(tmp->priority);
@@ -422,7 +422,7 @@ void YKSemPost(semptr semaphore){
 	tmp = topPriority;
 	
 	#ifdef DEBUG
-	printString("Pending task priority is ");
+	printString("Top priority pending task priority is ");
 	printInt(tmp->priority);
 	printNewLine();
 	#endif	
@@ -480,29 +480,29 @@ void YKSemPost(semptr semaphore){
 }
 
 //pend on a semaphore that is passed in
-void YKSemPend(semptr semaphore){
+void YKSemPend(semptr sem){
 	TCBptr tmp, tmp2;
 	#ifdef DEBUG
 	tmp = YKCurrentTask;
 	printString("Entering YKSemPend...");
 	printNewLine();
-	printString("Semaphore id is ");
-	printInt(semaphore->id);
-	printNewLine();
 	printString("Pending task priority is ");
 	printInt(tmp->priority);
 	printNewLine();
+	printString("Semaphore id is ");
+	printInt(sem->id);
+	printNewLine();
 	#endif
 	YKEnterMutex();
-	semaphore->value--;
-	if(semaphore->value >= 0){
+	sem->value--;
+	if(sem->value >= 0){
 		YKExitMutex();
 		return;
 	}
 	else{
 		YKSuspCnt++;
 		tmp = YKCurrentTask;
-		tmp->pending = semaphore;
+		tmp->pending = sem;
 		YKRdyList = tmp->next; /* update the ready list (by removing the current task) */
 		tmp->next->prev = NULL;
 

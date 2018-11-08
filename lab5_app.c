@@ -28,11 +28,11 @@ void TaskWord(void)
         printString("Hey");
         YKSemPost(PSemPtr);
                 
-        YKSemPend(WSemPtr); 
+        YKSemPend(WSemPtr);
         printString("it");
         YKSemPost(SSemPtr);
                 
-        YKSemPend(WSemPtr); 
+        YKSemPend(WSemPtr);
         printString("works");
         YKSemPost(PSemPtr);
     }
@@ -160,6 +160,18 @@ void main(void)
     SSemPtr = YKSemCreate(0);
     WSemPtr = YKSemCreate(0);
     NSemPtr = YKSemCreate(0);
+    printString("PSemPtr id: ");
+	printInt(PSemPtr->id);
+	printNewLine();
+ printString("SSemPtr id: ");
+	printInt(SSemPtr->id);
+	printNewLine();
+ printString("WSemPtr id: ");
+	printInt(WSemPtr->id);
+	printNewLine();
+ printString("NSemPtr id: ");
+	printInt(NSemPtr->id);
+	printNewLine();
     YKNewTask(TaskStat, (void *) &TaskStatStk[TASK_STACK_SIZE], 30);
     
     YKRun();
