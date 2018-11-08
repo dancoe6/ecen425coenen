@@ -46,7 +46,7 @@ typedef struct semaphore{
   int id;
 } YKSEM;
 
-
+extern YKSEM YKSemArray[MAX_SEM_COUNT]; /*array to allocate all needed semaphores*/
 
 //Initializes all required kernel data structures
 void YKInitialize(void);

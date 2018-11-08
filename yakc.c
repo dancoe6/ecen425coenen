@@ -8,7 +8,7 @@
 int YKCtxSwCount = 0; //Global variable tracking context switches
 int YKIdleCount = 0; //Global variable used by idle task
 int YKTickNum = 0; //Global variable incremented by tick handler
-int YKISRDepth = 0;
+int YKISRDepth = 0; //Global variable to track depth of nested ISR calls
 
 TCBptr YKRdyList = 0;		/* a list of TCBs of all ready tasks in order of decreasing priority */
 TCBptr YKSuspList = 0;		/* tasks delayed or suspended */
@@ -352,17 +352,20 @@ void YKTickHandler(void){
 //Creates and initializes a semaphore
 //must be called exactly once and before post or pend to that semaphore
 semptr YKSemCreate(int initialValue){
-	static int YKSemCnt;
+	static int YKSemCnt = 0;
 	semptr temp;
-
-	temp->value = initialValue;
-	temp->id = YKSemCnt;
-	YKSemCnt++;
-	#ifdef DEBUG
-	printString("Semaphore created - id: ");
-	printInt(temp->id);
-	printNewLine();
-	#endif
+	if(YKSemCnt >= (MAX_SEM_COUNT-1)){
+		printString("ERROR:Semaphore not created, no space in array.");
+		printNewLine();
+	}else{
+		temp->value = initialValue;
+		temp->id = YKSemCnt;
+		YKSemCnt++;
+		#ifdef DEBUG
+		printString("Semaphore created - id: ");
+		printInt(temp->id);
+		printNewLine();
+		#endif
 	return temp;
 }
 
