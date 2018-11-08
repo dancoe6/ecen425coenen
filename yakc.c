@@ -3,7 +3,7 @@
 #include "clib.h"
 
 #define NULL 0
-#define DEBUG 0
+//#define DEBUG 0
 
 int YKCtxSwCount = 0; //Global variable tracking context switches
 int YKIdleCount = 0; //Global variable used by idle task
@@ -20,6 +20,9 @@ TCBptr YKCurrentTask = 0; //
 void YKIdleTask(void);
 int IdleStk[IDLE_STACK_SIZE];
 int YKSuspCnt = 0;
+
+YKSEM YKSemArray[MAX_SEM_COUNT] = {0};
+int YKSemIndex = 0;
 
 extern void asm_save_context(void);
 extern void asm_load_context(void);
@@ -124,11 +127,32 @@ void YKDelayTask(unsigned count){
     TCBptr tmp, tmp2;
 	int i, c;
     YKEnterMutex();
+	c = YKSuspCnt;
 #ifdef DEBUG
 	printString("Entering YKDelayTask...\n");
+	tmp = YKSuspList;
+	printString("SuspList before YKdelay\n");
+	for (i = 0; i < c; i++){
+		printInt(tmp->priority);
+		printString(": delay - ");
+		printInt(tmp->delay);
+		printNewLine();
+		tmp = tmp->next;
+	}
 #endif
+
+#ifdef DEBUG
+	printString("RdyList before YKDelay\n");
+	tmp = YKRdyList;
+	while(tmp != NULL){
+		printInt(tmp->priority);
+		printNewLine();
+		tmp = tmp->next;
+	}
+	printNewLine();
+#endif
+
 	YKSuspCnt++;
-	c = YKSuspCnt;
     tmp = YKCurrentTask;
 	tmp->delay = count; //set delay counter to the count value passed in
     YKRdyList = tmp->next; /* update the ready list (by removing the current task) */
@@ -142,36 +166,11 @@ void YKDelayTask(unsigned count){
     else{			/* not first insertion */
 	/* insert in sorted delay list */
 		tmp2 = YKSuspList;
-		while (tmp2->priority < tmp->priority && tmp2->next != NULL){
-			tmp2 = tmp2->next;
-		}
-		if (tmp2->next == NULL){
-			tmp2->next = tmp;
-			tmp->prev = tmp2;
-			tmp->next = NULL;
-		}
-		else if (tmp2->prev == NULL){	/* insert in list before tmp2 */
-			YKSuspList = tmp;
-			tmp->prev = NULL;
-			tmp->next = tmp2;
-			tmp2->prev = tmp;
-		}
-		else{
-
-			tmp2->prev->next = tmp;
-			tmp->prev = tmp2->prev;
-			tmp->next = tmp2;
-			tmp2->prev = tmp;
-		}
+		tmp2->prev = tmp;
+		tmp->next = tmp2;
+		tmp->prev = NULL;
+		YKSuspList = tmp;
     }
-/*
-	tmp = YKSuspList;
-	printString("SuspList after YKdelay sort\n");
-	for (i = 0; i < c; i++){
-		printInt(tmp->delay);
-		printNewLine();
-		tmp = tmp->next;
-	}*/
 
     YKScheduler();
 
@@ -252,7 +251,7 @@ void YKTickHandler(void){
 	printString("Entering YKTickHandler...\n");
 	printNewLine();
 #endif
-#ifdef DEBUG
+#ifdef DEBU
 	tmp = YKSuspList;
 	printString("SuspList before YKTick\n");
 	for (i = 0; i < c; i++){
@@ -279,10 +278,7 @@ void YKTickHandler(void){
 	for (i = 0; i < c; i++){
 
 
-		if(tmp->delay == 0){ //if it has reached zero, insert in YKRdyList
-
-			//printInt(YKSuspList->priority);
-			//printInt(tmp->next->delay);
+		if(tmp->delay == 0 && tmp->pending == NULL){ //if it has reached zero, insert in YKRdyList
 
 			tmp3 = tmp->next;
 			if (tmp->prev == NULL){ //if the top of the delay list is ready
@@ -319,7 +315,7 @@ void YKTickHandler(void){
 		else
 			tmp = tmp->next;
 	}
-#ifdef DEBUG
+#ifdef DEBU
 	c = YKSuspCnt;
 	tmp = YKSuspList;
 	printString("SuspList after YKTick\n");
@@ -333,58 +329,111 @@ void YKTickHandler(void){
 #endif
 
 	YKScheduler();
-
 }
 
 
 //Creates and initializes a semaphore
 //must be called exactly once and before post or pend to that semaphore
 semptr YKSemCreate(int initialValue){
+	static int YKSemCnt;
 	semptr temp;
-
+	temp = &YKSemArray[YKSemIndex];
+	YKSemIndex++;
 	temp->value = initialValue;
+	temp->id = YKSemCnt;
+	YKSemCnt++;
 	#ifdef DEBUG
-	printString("Semaphore created");
+	printString("Semaphore created - id: ");
+	printInt(temp->id);
 	printNewLine();
 	#endif
 	return temp;
 }
 
 //post to the semaphore passed in
-void YKSemPost(semptr semaphore){
+void YKSemPost(semptr sem){
 	int c, i, first;
 	TCBptr tmp, tmp2,topPriority;
-	#ifdef DEBUG
-	printString("posting ");
-	printInt(semaphore);
-	printNewLine();
-	#endif
+	YKEnterMutex();
 	first = 1;
 	c = YKSuspCnt;
-	YKEnterMutex();
-	if(semaphore->value++ >= 0){
+
+	#ifdef DEBUG
+	printNewLine();
+	printString("Entering YKSemPost...");
+	printString("SuspList before YKSemPost\n");
+	tmp = YKSuspList;
+	for (i = 0; i < c; i++){
+		printInt(tmp->priority);
+		printNewLine();
+		tmp = tmp->next;
+	}
+	printNewLine();
+	printString("Semaphore being posted is ");
+	printInt(sem->id);
+	printNewLine();
+	#endif
+
+	sem->value++;//increment semaphore value
+	if(sem->value > 0){//if no task is pending on this semaphore...
 		YKExitMutex();
 		return;
 	}
+
 	tmp = YKSuspList;
-	for(i = 0;i< c;i++){//go through each suspended task
-		if(tmp->pending == semaphore){ //if this task is waiting on given semaphore
+	while(tmp != NULL){//go through each suspended tasks to find if one is pending this semaphore
+
+		if(tmp->pending == sem){ //if this task is pending on given semaphore
+
+			#ifdef DEBUG
+			printString("One pending task priority is ");
+			printInt(tmp->priority);
+			printString(" - id: ");
+			printInt(tmp->pending->id);
+			printNewLine();
+			#endif
+
 			if(first){ //if first found
 				topPriority = tmp;
 				first = 0; //lower flag
 			}
-			if(tmp->priority < topPriority->priority){ //if this task has highest priority so far
+			else if(tmp->priority < topPriority->priority){ //if this task has highest priority so far
 				topPriority = tmp;
 			}
 		}
+		tmp = tmp->next;
 	}
-	tmp = topPriority;
-	//add unsuspended task to the YKRdyList
+
+	if (first != 0) //if no task is pending this semaphore...
+		return;
+		
+	tmp = topPriority; //select the highest priority task pending this semaphore
+	
+	#ifdef DEBUG
+	printString("Top priority pending task's priority is ");
+	printInt(tmp->priority);
+	printNewLine();
+	#endif	
+
+	//remove the task from YKSuspList
+	if (tmp->prev == NULL){ //if at the top of the suspend list 
+			YKSuspList = tmp->next;
+			YKSuspList->prev = NULL;
+	}
+	else{
+		tmp->prev->next = tmp->next;
+		tmp->next->prev = tmp->prev;
+	}
+	
+
+
+	//add the task to the YKRdyList (sorted by priority)
 	tmp2 = YKRdyList;
+	tmp->pending = NULL;
 	while (tmp2->priority < tmp->priority){
 		tmp2 = tmp2->next;	//assumes idle task is at end
 	}
-	if (tmp2->prev == NULL){	// insert in list before tmp2
+	if (tmp2->prev == NULL){
 		YKRdyList = tmp;
 		tmp->prev = NULL;
 		tmp->next = tmp2;
@@ -398,41 +447,66 @@ void YKSemPost(semptr semaphore){
 	}
 	YKSuspCnt--;
 
+
+	#ifdef DEBUG
+	printString("RdyList after YKSemPost\n");
+	tmp = YKRdyList;
+	while(tmp != NULL){
+		printInt(tmp->priority);
+		printNewLine();
+		tmp = tmp->next;
+	}
+	printNewLine();
+	#endif
+
+
 	if(YKISRDepth == 0){
 		YKScheduler();
 	}
-	YKExitMutex();
 }
 
 //pend on a semaphore that is passed in
-void YKSemPend(semptr semaphore){
-	TCBptr tmp;
+void YKSemPend(semptr sem){
+	TCBptr tmp, tmp2;
+
 	#ifdef DEBUG
-	printString("pending ");
-	printInt(semaphore);
+	tmp = YKCurrentTask;
+	printString("Entering YKSemPend...");
+	printNewLine();
+	printString("Pending task priority is ");
+	printInt(tmp->priority);
+	printNewLine();
+	printString("Semaphore id is ");
+	printInt(sem->id);
 	printNewLine();
 	#endif
+
 	YKEnterMutex();
-	if(semaphore->value > 0){
-		semaphore->value--;
+	sem->value--; //decrement semaphore value
+	if(sem->value >= 0){//if the semaphore was available...
 		YKExitMutex();
 		return;
-	}else{
-		semaphore->value--;
-
+	}
+	else{ //if the semaphore is unavailable
 		YKSuspCnt++;
 		tmp = YKCurrentTask;
-		tmp->pending = semaphore;
+		tmp->pending = sem;
 		YKRdyList = tmp->next; /* update the ready list (by removing the current task) */
 		tmp->next->prev = NULL;
-
+		
+		//move the current task to the suspend list
 		if (YKSuspList == NULL){	/* is this first insertion? */
 			tmp->next = NULL;
-		}else{			/* not first insertion */
-			tmp->next = YKSuspList;
+		}
+		else{	/* not first insertion */
+			tmp2 = YKSuspList;
+			tmp->next = tmp2;
+			tmp2->prev = tmp;
 		}
 		tmp->prev = NULL;
 		YKSuspList = tmp;
+
 		YKScheduler();
 	}
 }
+

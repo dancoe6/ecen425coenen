@@ -1,5 +1,5 @@
 #include "clib.h"
-//#include "yakk.h"
+#include "yakk.h"
 
 extern int KeyBuffer;
 static unsigned int tick_count;
@@ -31,11 +31,11 @@ printNewLine();
 printString("DELAY COMPLETE");
 printNewLine();
 }
-
 else if(KeyBuffer == 'p'){
-	printString("p key pressed, need to uncomment yksempost");
-	printNewLine();
-	//YKSemPost(NSemPtr);
+	//printString("p key pressed, need to uncomment yksempost");
+	//printNewLine();
+	YKSemPost(&YKSemArray[3]);
+	
 }else{
 printNewLine();
 printString("KEYPRESS (");
