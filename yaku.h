@@ -2,4 +2,3 @@
 #pragma once
 #define IDLE_STACK_SIZE 256
 #define MAX_TASK_COUNT 32
-#defien MAX_SEM_COUNT 4

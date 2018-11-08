@@ -3,12 +3,12 @@
 #include "clib.h"
 
 #define NULL 0
-#define DEBUG 0
+//#define DEBUG 0
 
 int YKCtxSwCount = 0; //Global variable tracking context switches
 int YKIdleCount = 0; //Global variable used by idle task
 int YKTickNum = 0; //Global variable incremented by tick handler
-int YKISRDepth = 0; //Global variable to track depth of nested ISR calls
+int YKISRDepth = 0;
 
 TCBptr YKRdyList = 0;		/* a list of TCBs of all ready tasks in order of decreasing priority */
 TCBptr YKSuspList = 0;		/* tasks delayed or suspended */
@@ -20,6 +20,9 @@ TCBptr YKCurrentTask = 0; //
 void YKIdleTask(void);
 int IdleStk[IDLE_STACK_SIZE];
 int YKSuspCnt = 0;
+
+YKSEM YKSemArray[10] = {0};
+int YKSemIndex = 0;
 
 extern void asm_save_context(void);
 extern void asm_load_context(void);
@@ -128,13 +131,27 @@ void YKDelayTask(unsigned count){
 #ifdef DEBUG
 	printString("Entering YKDelayTask...\n");
 	tmp = YKSuspList;
-	printString("SuspList before YKdelay sort\n");
+	printString("SuspList before YKdelay\n");
 	for (i = 0; i < c; i++){
+		printInt(tmp->priority);
+		printString(": delay - ");
 		printInt(tmp->delay);
 		printNewLine();
 		tmp = tmp->next;
 	}
 #endif
+
+#ifdef DEBUG
+	printString("RdyList before YKDelay\n");
+	tmp = YKRdyList;
+	while(tmp != NULL){
+		printInt(tmp->priority);
+		printNewLine();
+		tmp = tmp->next;
+	}
+	printNewLine();
+#endif
+
 	YKSuspCnt++;
     tmp = YKCurrentTask;
 	tmp->delay = count; //set delay counter to the count value passed in
@@ -292,7 +309,7 @@ void YKTickHandler(void){
 	for (i = 0; i < c; i++){
 
 
-		if(tmp->delay == 0){ //if it has reached zero, insert in YKRdyList
+		if(tmp->delay == 0 && tmp->pending == NULL){ //if it has reached zero, insert in YKRdyList
 
 			//printInt(YKSuspList->priority);
 			//printInt(tmp->next->delay);
@@ -352,20 +369,18 @@ void YKTickHandler(void){
 //Creates and initializes a semaphore
 //must be called exactly once and before post or pend to that semaphore
 semptr YKSemCreate(int initialValue){
-	static int YKSemCnt = 0;
+	static int YKSemCnt;
 	semptr temp;
-	if(YKSemCnt >= (MAX_SEM_COUNT-1)){
-		printString("ERROR:Semaphore not created, no space in array.");
-		printNewLine();
-	}else{
-		temp->value = initialValue;
-		temp->id = YKSemCnt;
-		YKSemCnt++;
-		#ifdef DEBUG
-		printString("Semaphore created - id: ");
-		printInt(temp->id);
-		printNewLine();
-		#endif
+	temp = &YKSemArray[YKSemIndex];
+	YKSemIndex++;
+	temp->value = initialValue;
+	temp->id = YKSemCnt;
+	YKSemCnt++;
+	#ifdef DEBUG
+	printString("Semaphore created - id: ");
+	printInt(temp->id);
+	printNewLine();
+	#endif
 	return temp;
 }
 
@@ -390,17 +405,19 @@ void YKSemPost(semptr sem){
 	printString("Semaphore being posted is ");
 	printInt(sem->id);
 	printNewLine();
+	printInt(sem->value);
 	#endif
 
 	first = 1;
 	sem->value++;
-	if(sem->value == 0){
+	if(sem->value > 0){
 		YKExitMutex();
 		return;
 	}
 	tmp = YKSuspList;
 	while(tmp != NULL){//go through each suspended tasks to find if one is pending this semaphore
-		if(tmp->pending->id == sem->id){ //if this task is pending on given semaphore
+
+		if(tmp->pending == sem){ //if this task is pending on given semaphore
 			#ifdef DEBUG
 			printString("One pending task priority is ");
 			printInt(tmp->priority);
@@ -425,7 +442,7 @@ void YKSemPost(semptr sem){
 	tmp = topPriority;
 	
 	#ifdef DEBUG
-	printString("Top priority pending task priority is ");
+	printString("Top priority pending task's priority is ");
 	printInt(tmp->priority);
 	printNewLine();
 	#endif	
@@ -444,6 +461,7 @@ void YKSemPost(semptr sem){
 
 	//add unsuspended task to the YKRdyList
 	tmp2 = YKRdyList;
+	tmp->pending = NULL;
 	while (tmp2->priority < tmp->priority){
 		tmp2 = tmp2->next;	//assumes idle task is at end
 	}
