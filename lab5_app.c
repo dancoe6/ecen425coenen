@@ -153,25 +153,13 @@ void TaskStat(void)                /* a task to track statistics */
 void main(void)
 {
     YKInitialize();
-    printString("test\r\n");
-    
+
     /* create all semaphores, at least one user task, etc. */
     PSemPtr = YKSemCreate(1);
     SSemPtr = YKSemCreate(0);
     WSemPtr = YKSemCreate(0);
     NSemPtr = YKSemCreate(0);
-    printString("PSemPtr id: ");
-	printInt(PSemPtr->id);
-	printNewLine();
- printString("SSemPtr id: ");
-	printInt(SSemPtr->id);
-	printNewLine();
- printString("WSemPtr id: ");
-	printInt(WSemPtr->id);
-	printNewLine();
- printString("NSemPtr id: ");
-	printInt(NSemPtr->id);
-	printNewLine();
+  
     YKNewTask(TaskStat, (void *) &TaskStatStk[TASK_STACK_SIZE], 30);
     
     YKRun();

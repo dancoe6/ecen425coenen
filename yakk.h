@@ -46,7 +46,7 @@ typedef struct semaphore{
   int id;
 } YKSEM;
 
-extern YKSEM YKSemArray[10];
+extern YKSEM YKSemArray[MAX_SEM_COUNT];
 
 //Initializes all required kernel data structures
 void YKInitialize(void);
@@ -93,3 +93,4 @@ void YKSemPost(semptr semaphore);
 
 //pend on a semaphore that is passed in
 void YKSemPend(semptr semaphore);
+
