@@ -8,6 +8,7 @@ extern int YKTickNum; //Global variable incremented by tick handler
 enum taskState{ running, ready, delayed, suspended};
 typedef struct taskblock *TCBptr;
 typedef struct semaphore *semptr;
+typedef struct msgqueue* YKQptr;
 typedef struct taskblock
 {				/* the TCB struct definition */
     void *stackptr;		/* pointer to current top of stack */
@@ -30,6 +31,7 @@ typedef struct taskblock
     TCBptr next;		/* forward ptr for dbl linked list */
     TCBptr prev;		/* backward ptr for dbl linked list */
     semptr pending; /*semaphore that task is waiting for*/
+    YKQptr pendingQueue;
 }  TCB;
 
 extern TCBptr YKRdyList;		/* a list of TCBs of all ready tasks
@@ -40,7 +42,6 @@ extern TCB    YKTCBArray[MAX_TASK_COUNT+1];	/* array to allocate all needed TCBs
 				   (extra one is for the idle task) */
 
 //semaphore structures
-
 typedef struct semaphore{
   int value;
   int id;
@@ -48,15 +49,20 @@ typedef struct semaphore{
 
 extern YKSEM YKSemArray[MAX_SEM_COUNT];
 
+
+//queue struct
 typedef struct msgqueue
 {
-
     /* What goes here?? */
-    int info;
-    // nextspace;
-    // lastmsg;
-
+    // int info;
+    int head;
+    int tail;
+    void** baseAddress;
+    unsigned size;
+    unsigned currentSize;
 } YKQ;
+
+extern YKQ YKQArray[MAX_QUEUE_COUNT];
 
 
 //Initializes all required kernel data structures
@@ -113,4 +119,3 @@ void *YKQPend(YKQ *queue);
 
 //Place a message in a message queue
 int YKQPost(YKQ *queue, void *msg);
-

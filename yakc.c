@@ -3,7 +3,7 @@
 #include "clib.h"
 
 #define NULL 0
-//#define DEBUG 0
+// #define DEBUG 0
 
 int YKCtxSwCount = 0; //Global variable tracking context switches
 int YKIdleCount = 0; //Global variable used by idle task
@@ -11,7 +11,7 @@ int YKTickNum = 0; //Global variable incremented by tick handler
 int YKISRDepth = 0;
 
 TCBptr YKRdyList = 0;		/* a list of TCBs of all ready tasks in order of decreasing priority */
-TCBptr YKSuspList = 0;		/* tasks delayed or suspended */
+TCBptr YKSuspList = NULL;		/* tasks delayed or suspended */
 TCBptr YKAvailTCBList = 0;		/* a list of available TCBs */
 TCB YKTCBArray[MAX_TASK_COUNT+1] = {0};	/* array to allocate all needed TCBs
 				   				(extra one is for the idle task) */
@@ -23,6 +23,8 @@ int YKSuspCnt = 0;
 
 YKSEM YKSemArray[MAX_SEM_COUNT] = {0};
 int YKSemIndex = 0;
+YKQ YKQArray[MAX_QUEUE_COUNT] = {0};
+int YKQIndex = 0;
 
 extern void asm_save_context(void);
 extern void asm_load_context(void);
@@ -278,7 +280,7 @@ void YKTickHandler(void){
 	for (i = 0; i < c; i++){
 
 
-		if(tmp->delay == 0 && tmp->pending == NULL){ //if it has reached zero, insert in YKRdyList
+		if(tmp->delay == 0 && tmp->pending == NULL && tmp->pendingQueue == NULL){ //if it has reached zero, insert in YKRdyList
 
 			tmp3 = tmp->next;
 			if (tmp->prev == NULL){ //if the top of the delay list is ready
@@ -405,17 +407,17 @@ void YKSemPost(semptr sem){
 
 	if (first != 0) //if no task is pending this semaphore...
 		return;
-		
+
 	tmp = topPriority; //select the highest priority task pending this semaphore
-	
+
 	#ifdef DEBUG
 	printString("Top priority pending task's priority is ");
 	printInt(tmp->priority);
 	printNewLine();
-	#endif	
+	#endif
 
 	//remove the task from YKSuspList
-	if (tmp->prev == NULL){ //if at the top of the suspend list 
+	if (tmp->prev == NULL){ //if at the top of the suspend list
 			YKSuspList = tmp->next;
 			YKSuspList->prev = NULL;
 	}
@@ -423,7 +425,7 @@ void YKSemPost(semptr sem){
 		tmp->prev->next = tmp->next;
 		tmp->next->prev = tmp->prev;
 	}
-	
+
 
 
 	//add the task to the YKRdyList (sorted by priority)
@@ -492,7 +494,7 @@ void YKSemPend(semptr sem){
 		tmp->pending = sem;
 		YKRdyList = tmp->next; /* update the ready list (by removing the current task) */
 		tmp->next->prev = NULL;
-		
+
 		//move the current task to the suspend list
 		if (YKSuspList == NULL){	/* is this first insertion? */
 			tmp->next = NULL;
@@ -511,11 +513,148 @@ void YKSemPend(semptr sem){
 
 
 //Create and initialize a message queue and returns a pointer to the kernel's data structure used to maintain that queue
-YKQ *YKQCreate(void **start, unsigned size){}
+YKQ *YKQCreate(void **start, unsigned size){
+	YKQ* tmp;
+	tmp = &YKQArray[YKQIndex];
+	YKQIndex++;
+	tmp->baseAddress = start;
+	tmp->size = size;
+	tmp->head = 0;
+	tmp->tail = 0;
+	tmp->currentSize = 0;
+	return tmp;
+}
 
 //Remove the oldest message from the indicated message queue if it is non-empty.
-void *YKQPend(YKQ *queue){}
+void *YKQPend(YKQ *queue){
+	void** ret;
+	TCBptr tmp,tmp2;
+	YKEnterMutex();
+	if(queue->currentSize >0){
+		ret = (queue->baseAddress + queue->head); //return oldest message
+		queue->head++; //move head to next oldest message
+		if(queue->head = queue->size){ //if head went past end, reset to 0
+			queue->head = 0;
+		}
+		queue->currentSize--; //decrement current size
+		YKExitMutex();
+		return *ret;
+	}else{
+		YKSuspCnt++;
+		tmp = YKCurrentTask;
+		tmp->pendingQueue = queue;
+		YKRdyList = tmp->next; /* update the ready list (by removing the current task) */
+		tmp->next->prev = NULL;
+
+		//move the current task to the suspend list
+		if (YKSuspList == NULL){	/* is this first insertion? */
+			tmp->next = NULL;
+		}
+		else{	/* not first insertion */
+			tmp2 = YKSuspList;
+			tmp->next = tmp2;
+			tmp2->prev = tmp;
+		}
+		tmp->prev = NULL;
+		YKSuspList = tmp;
+
+		YKScheduler();
+	}
+}
 
 //Place a message in a message queue
-int YKQPost(YKQ *queue, void *msg){}
+int YKQPost(YKQ *queue, void *msg){
+	void** ret;
+	TCBptr tmp,tmp2,topPriority;
+	int first;
+	YKEnterMutex();
+	first = 1;
+	if(queue->size > queue->currentSize){ //if there is space in queue
+		ret = (queue->baseAddress + queue->tail); //get address where msg should go
+		*ret = msg; //put msg there
+		queue->currentSize++;
+		queue->tail++;
+		if(queue->tail = queue->size){ //if tail went past end, reset to 0
+			queue->tail = 0;
+		}
 
+		tmp = YKSuspList;
+		while(tmp != NULL){//go through each suspended tasks to find if one is pending this queue
+
+			if(tmp->pendingQueue == queue){ //if this task is pending on given queue
+
+				if(first){ //if first found
+					topPriority = tmp;
+					first = 0; //lower flag
+				}
+				else if(tmp->priority < topPriority->priority){ //if this task has highest priority so far
+					topPriority = tmp;
+				}
+			}
+			tmp = tmp->next;
+		}
+
+		if (first != 0) //if no task is pending this queue...
+			return 1;
+
+		tmp = topPriority; //select the highest priority task pending this queue
+
+		#ifdef DEBUG
+		printString("Top priority pending queue task's priority is ");
+		printInt(tmp->priority);
+		printNewLine();
+		#endif
+
+		//remove the task from YKSuspList
+		if (tmp->prev == NULL){ //if at the top of the suspend list
+				YKSuspList = tmp->next;
+				YKSuspList->prev = NULL;
+		}
+		else{
+			tmp->prev->next = tmp->next;
+			tmp->next->prev = tmp->prev;
+		}
+
+		//add the task to the YKRdyList (sorted by priority)
+		tmp2 = YKRdyList;
+		tmp->pending = NULL;
+		while (tmp2->priority < tmp->priority){
+			tmp2 = tmp2->next;	//assumes idle task is at end
+		}
+		if (tmp2->prev == NULL){
+			YKRdyList = tmp;
+			tmp->prev = NULL;
+			tmp->next = tmp2;
+			tmp2->prev = tmp;
+		}
+		else{
+			tmp2->prev->next = tmp;
+			tmp->prev = tmp2->prev;
+			tmp->next = tmp2;
+			tmp2->prev = tmp;
+		}
+		YKSuspCnt--;
+
+		#ifdef DEBUG
+		printString("RdyList after YKQPost\n");
+		tmp = YKRdyList;
+		while(tmp != NULL){
+			printInt(tmp->priority);
+			printNewLine();
+			tmp = tmp->next;
+		}
+		printNewLine();
+		#endif
+
+		if(YKISRDepth == 0){
+			YKScheduler();
+		}else{
+			YKExitMutex();
+		}
+
+		return 1;
+	}else{
+		YKExitMutex();
+		return 0; //failed, no room in queue
+	}
+}
