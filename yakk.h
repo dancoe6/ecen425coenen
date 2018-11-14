@@ -48,6 +48,17 @@ typedef struct semaphore{
 
 extern YKSEM YKSemArray[MAX_SEM_COUNT];
 
+typedef struct msgqueue
+{
+
+    /* What goes here?? */
+    int info;
+    // nextspace;
+    // lastmsg;
+
+} YKQ;
+
+
 //Initializes all required kernel data structures
 void YKInitialize(void);
 
@@ -93,4 +104,13 @@ void YKSemPost(semptr semaphore);
 
 //pend on a semaphore that is passed in
 void YKSemPend(semptr semaphore);
+
+//Create and initialize a message queue and returns a pointer to the kernel's data structure used to maintain that queue
+YKQ *YKQCreate(void **start, unsigned size);
+
+//Remove the oldest message from the indicated message queue if it is non-empty.
+void *YKQPend(YKQ *queue);
+
+//Place a message in a message queue
+int YKQPost(YKQ *queue, void *msg);
 

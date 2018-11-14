@@ -310,7 +310,6 @@ void YKTickHandler(void){
 			}
 			YKSuspCnt--;
 			tmp = tmp3;
-			//break;
 		}
 		else
 			tmp = tmp->next;
@@ -509,4 +508,14 @@ void YKSemPend(semptr sem){
 		YKScheduler();
 	}
 }
+
+
+//Create and initialize a message queue and returns a pointer to the kernel's data structure used to maintain that queue
+YKQ *YKQCreate(void **start, unsigned size){}
+
+//Remove the oldest message from the indicated message queue if it is non-empty.
+void *YKQPend(YKQ *queue){}
+
+//Place a message in a message queue
+int YKQPost(YKQ *queue, void *msg){}
 
