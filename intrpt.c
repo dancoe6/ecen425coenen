@@ -1,7 +1,7 @@
 #include "clib.h"
 #include "yakk.h"
 #include "lab6defs.h"
-
+#include "intrpt.h"
 #define LAB6
 
 extern int KeyBuffer;
@@ -49,7 +49,6 @@ printNewLine();
 void keyboardHandler(void){
 
 #ifdef LAB6
-
 
 GlobalFlag = 1;
 

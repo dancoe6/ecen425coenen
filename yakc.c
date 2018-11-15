@@ -1,7 +1,7 @@
 #include "yakk.h"
 #include "yaku.h"
 #include "clib.h"
-
+#include "intrpt.h"
 #define NULL 0
 // #define DEBUG 0
 
@@ -275,7 +275,6 @@ void YKTickHandler(void){
 
 	}
 
-
 	tmp = YKSuspList;
 	for (i = 0; i < c; i++){
 
@@ -522,6 +521,11 @@ YKQ *YKQCreate(void **start, unsigned size){
 	tmp->head = 0;
 	tmp->tail = 0;
 	tmp->currentSize = 0;
+	#ifdef DEBUG
+	printString("Created queue of size ");
+	printInt(tmp->size);
+	printNewLine();
+	#endif
 	return tmp;
 }
 
@@ -529,17 +533,13 @@ YKQ *YKQCreate(void **start, unsigned size){
 void *YKQPend(YKQ *queue){
 	void** ret;
 	TCBptr tmp,tmp2;
+	#ifdef DEBUG
+	printString("YKQPend: message #");
+	printInt(queue->currentSize);
+	printNewLine();
+	#endif
 	YKEnterMutex();
-	if(queue->currentSize >0){
-		ret = (queue->baseAddress + queue->head); //return oldest message
-		queue->head++; //move head to next oldest message
-		if(queue->head = queue->size){ //if head went past end, reset to 0
-			queue->head = 0;
-		}
-		queue->currentSize--; //decrement current size
-		YKExitMutex();
-		return *ret;
-	}else{
+	if(queue->currentSize == 0){
 		YKSuspCnt++;
 		tmp = YKCurrentTask;
 		tmp->pendingQueue = queue;
@@ -560,6 +560,14 @@ void *YKQPend(YKQ *queue){
 
 		YKScheduler();
 	}
+	ret = (queue->baseAddress + queue->head); //return oldest message
+	queue->head++; //move head to next oldest message
+	if(queue->head == queue->size){ //if head went past end, reset to 0
+		queue->head = 0;
+	}
+	queue->currentSize--; //decrement current size
+	YKExitMutex();
+	return *ret;
 }
 
 //Place a message in a message queue
@@ -568,13 +576,18 @@ int YKQPost(YKQ *queue, void *msg){
 	TCBptr tmp,tmp2,topPriority;
 	int first;
 	YKEnterMutex();
+	#ifdef DEBUG
+	printString("YKQPost: message #");
+	printInt(queue->currentSize+1);
+	printNewLine();
+	#endif
 	first = 1;
 	if(queue->size > queue->currentSize){ //if there is space in queue
 		ret = (queue->baseAddress + queue->tail); //get address where msg should go
 		*ret = msg; //put msg there
 		queue->currentSize++;
 		queue->tail++;
-		if(queue->tail = queue->size){ //if tail went past end, reset to 0
+		if(queue->tail == queue->size){ //if tail went past end, reset to 0
 			queue->tail = 0;
 		}
 
@@ -617,7 +630,7 @@ int YKQPost(YKQ *queue, void *msg){
 
 		//add the task to the YKRdyList (sorted by priority)
 		tmp2 = YKRdyList;
-		tmp->pending = NULL;
+		tmp->pendingQueue = NULL;
 		while (tmp2->priority < tmp->priority){
 			tmp2 = tmp2->next;	//assumes idle task is at end
 		}
