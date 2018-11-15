@@ -188,9 +188,9 @@ void YKEnterMutex(void){
 
 //Enables interrupts
 void YKExitMutex(void){
-	//if(YKRunState){ // If YKRun has been called...
+	if(YKRunState){ // If YKRun has been called...
 		asm_unmutex();
-	//}
+	}
 }
 
 
