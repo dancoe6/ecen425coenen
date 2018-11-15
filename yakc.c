@@ -1,9 +1,9 @@
 #include "yakk.h"
 #include "yaku.h"
 #include "clib.h"
-#include "intrpt.h"
+//#include "intrpt.h"
 #define NULL 0
-// #define DEBUG 0
+//#define DEBUG 0
 
 int YKCtxSwCount = 0; //Global variable tracking context switches
 int YKIdleCount = 0; //Global variable used by idle task
@@ -43,6 +43,7 @@ printString("Entering YKInitialize...\n");
     for (i = 0; i < MAX_TASK_COUNT+1; i++)
 		YKTCBArray[i].next = &(YKTCBArray[i+1]);
     YKTCBArray[MAX_TASK_COUNT+1].next = NULL;
+	YKExitMutex();
 	YKNewTask(YKIdleTask, (void *)&IdleStk[IDLE_STACK_SIZE], MAX_TASK_COUNT+1);
 	YKExitMutex();
 }
@@ -108,11 +109,6 @@ void YKIdleTask(){
 #ifdef DEBUG
 	printString("Entering YKIdleTask...\n");
 #endif
-/*	while(1){
-		YKEnterMutex();
-		YKIdleCount++;
-		YKExitMutex();
-	}*/
 	asm_idle_task();
 }
 
@@ -154,6 +150,7 @@ void YKDelayTask(unsigned count){
 	printNewLine();
 #endif
 
+
 	YKSuspCnt++;
     tmp = YKCurrentTask;
 	tmp->delay = count; //set delay counter to the count value passed in
@@ -186,33 +183,27 @@ Call the scheduler function;
 
 //Disables interrupts, written in assembly
 void YKEnterMutex(void){
-
 	asm_mutex();
 }
 
 //Enables interrupts
 void YKExitMutex(void){
-	if(YKRunState){ // If YKRun has been called...
+	//if(YKRunState){ // If YKRun has been called...
 		asm_unmutex();
-	}
+	//}
 }
 
 
 //Called on entry to ISR
 void YKEnterISR(void){
 	YKISRDepth++;
-/*
-??If it is not a nested interrupt, context should be saved to the TCB??
-Increment ISR depth counter;
-*/
 }
 
 //Called on exit from ISR
 void YKExitISR(void){
-/*
-Decrement ISR depth counter;
-If ISR depth counter is zero, call scheduler function;
-*/
+
+	YKISRDepth--;
+
 	if(YKISRDepth == 0){
 		YKScheduler();
 	}
@@ -247,6 +238,8 @@ void YKDispatcher(void){
 void YKTickHandler(void){
 	TCBptr tmp, tmp2, tmp3;
 	int i, c;
+	YKEnterMutex();
+
 	c = YKSuspCnt;
 
 #ifdef DEBUG
@@ -265,7 +258,6 @@ void YKTickHandler(void){
 	}
 #endif
 
-	YKEnterMutex();
 	YKTickNum++;
 	tmp = YKSuspList;
 	for (i = 0; i < c; i++){
@@ -327,8 +319,11 @@ void YKTickHandler(void){
 		tmp = tmp->next;
 	}
 #endif
+	
+	if (YKISRDepth == 0)
+		YKScheduler();
 
-	YKScheduler();
+	YKExitMutex();
 }
 
 
@@ -337,6 +332,8 @@ void YKTickHandler(void){
 semptr YKSemCreate(int initialValue){
 	static int YKSemCnt;
 	semptr temp;
+	YKEnterMutex();
+
 	temp = &YKSemArray[YKSemIndex];
 	YKSemIndex++;
 	temp->value = initialValue;
@@ -347,6 +344,7 @@ semptr YKSemCreate(int initialValue){
 	printInt(temp->id);
 	printNewLine();
 	#endif
+	YKExitMutex();
 	return temp;
 }
 
@@ -355,6 +353,7 @@ void YKSemPost(semptr sem){
 	int c, i, first;
 	TCBptr tmp, tmp2,topPriority;
 	YKEnterMutex();
+
 	first = 1;
 	c = YKSuspCnt;
 
@@ -404,8 +403,10 @@ void YKSemPost(semptr sem){
 		tmp = tmp->next;
 	}
 
-	if (first != 0) //if no task is pending this semaphore...
+	if (first != 0){ //if no task is pending this semaphore...
+		YKExitMutex();
 		return;
+	}
 
 	tmp = topPriority; //select the highest priority task pending this semaphore
 
@@ -463,6 +464,7 @@ void YKSemPost(semptr sem){
 	if(YKISRDepth == 0){
 		YKScheduler();
 	}
+	YKExitMutex();
 }
 
 //pend on a semaphore that is passed in
@@ -514,6 +516,7 @@ void YKSemPend(semptr sem){
 //Create and initialize a message queue and returns a pointer to the kernel's data structure used to maintain that queue
 YKQ *YKQCreate(void **start, unsigned size){
 	YKQ* tmp;
+	YKEnterMutex();
 	tmp = &YKQArray[YKQIndex];
 	YKQIndex++;
 	tmp->baseAddress = start;
@@ -526,6 +529,7 @@ YKQ *YKQCreate(void **start, unsigned size){
 	printInt(tmp->size);
 	printNewLine();
 	#endif
+	YKExitMutex();
 	return tmp;
 }
 
@@ -575,6 +579,7 @@ int YKQPost(YKQ *queue, void *msg){
 	void** ret;
 	TCBptr tmp,tmp2,topPriority;
 	int first;
+
 	YKEnterMutex();
 	#ifdef DEBUG
 	printString("YKQPost: message #");
@@ -607,12 +612,14 @@ int YKQPost(YKQ *queue, void *msg){
 			tmp = tmp->next;
 		}
 
-		if (first != 0) //if no task is pending this queue...
+		if (first != 0){ //if no task is pending this queue...
+			YKExitMutex();
 			return 1;
+		}
 
 		tmp = topPriority; //select the highest priority task pending this queue
 
-		#ifdef DEBUG
+		#ifdef DEBUGr
 		printString("Top priority pending queue task's priority is ");
 		printInt(tmp->priority);
 		printNewLine();
@@ -660,12 +667,14 @@ int YKQPost(YKQ *queue, void *msg){
 		#endif
 
 		if(YKISRDepth == 0){
+			printInt(YKISRDepth);
+			printNewLine();
 			YKScheduler();
 		}else{
 			YKExitMutex();
 		}
-
 		return 1;
+
 	}else{
 		YKExitMutex();
 		return 0; //failed, no room in queue

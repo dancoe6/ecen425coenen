@@ -16,11 +16,13 @@ reset_isr:
 	push bp
 	push es
 	push ds
+	call YKEnterISR
 	sti
 	call resetHandler
 	cli
 	mov	al, 0x20	; Load nonspecific EOI value (0x20) into register al
 	out	0x20, al	; Write EOI to PIC (port 0x20)
+	call YKExitISR
 	pop ds
 	pop es
 	pop bp
@@ -42,12 +44,14 @@ tick_isr:
 	push bp
 	push es
 	push ds
+	call YKEnterISR
 	sti
 	call YKTickHandler
-  call tickHandler
+  	call tickHandler
 	cli
 	mov	al, 0x20	; Load nonspecific EOI value (0x20) into register al
 	out	0x20, al	; Write EOI to PIC (port 0x20)
+	call YKExitISR
 	pop ds
 	pop es
 	pop bp
@@ -69,11 +73,13 @@ keyboard_isr:
 	push bp
 	push es
 	push ds
+	call YKEnterISR
 	sti
 	call keyboardHandler
 	cli
 	mov	al, 0x20	; Load nonspecific EOI value (0x20) into register al
 	out	0x20, al	; Write EOI to PIC (port 0x20)
+	call YKExitISR
 	pop ds
 	pop es
 	pop bp

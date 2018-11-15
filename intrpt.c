@@ -1,7 +1,8 @@
 #include "clib.h"
 #include "yakk.h"
 #include "lab6defs.h"
-#include "intrpt.h"
+//#include "intrpt.h"
+
 #define LAB6
 
 extern int KeyBuffer;
@@ -24,15 +25,17 @@ void tickHandler(void){
     static int next = 0;
     static int data = 0;
 
+    YKEnterMutex();
+
     // create a message with tick (sequence #) and pseudo-random data
     MsgArray[next].tick = YKTickNum;
     data = (data + 89) % 100;
     MsgArray[next].data = data;
+    YKExitMutex();
      if (YKQPost(MsgQPtr, (void *) &(MsgArray[next])) == 0)
 	printString("  TickISR: queue overflow! \n");
      else if (++next >= MSGARRAYSIZE)
 	next = 0;
-
 
 #else
 tick_count++;
@@ -51,7 +54,6 @@ void keyboardHandler(void){
 #ifdef LAB6
 
 GlobalFlag = 1;
-
 
 #else
 unsigned int delay = 0;

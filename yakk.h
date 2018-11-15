@@ -4,6 +4,7 @@
 extern int YKCtxSwCount; //Global variable tracking context switches
 extern int YKIdleCount; //Global variable used by idle task
 extern int YKTickNum; //Global variable incremented by tick handler
+extern int YKISRDepth;
 
 enum taskState{ running, ready, delayed, suspended};
 typedef struct taskblock *TCBptr;
