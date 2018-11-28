@@ -1,4 +1,4 @@
-/* 
+/*
 File: lab7defs.h
 Revision date: 26 December 2004
 Description: Required definitions for EE 425 lab 7 (Event flags)
@@ -12,9 +12,5 @@ Description: Required definitions for EE 425 lab 7 (Event flags)
 #define EVENT_2_KEY  0x2
 #define EVENT_3_KEY  0x4
 
-#define EVENT_WAIT_ANY 0x8
-#define EVENT_WAIT_ALL 0x0
-
 extern YKEVENT *charEvent;
 extern YKEVENT *numEvent;
-

@@ -1,6 +1,5 @@
 #include "clib.h"
 #include "yakk.h"
-#include "lab6defs.h"
 #include "lab7defs.h"
 
 #define LAB7

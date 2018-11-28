@@ -4,3 +4,4 @@
 #define MAX_TASK_COUNT 32
 #define MAX_SEM_COUNT 15
 #define MAX_QUEUE_COUNT 4
+#define MAX_EVENT_COUNT 10

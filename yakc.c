@@ -25,6 +25,8 @@ YKSEM YKSemArray[MAX_SEM_COUNT] = {0};
 int YKSemIndex = 0;
 YKQ YKQArray[MAX_QUEUE_COUNT] = {0};
 int YKQIndex = 0;
+YKEVENT YKEventArray[MAX_EVENT_COUNT] = {0};
+int YKEventIndex = 0;
 
 extern void asm_save_context(void);
 extern void asm_load_context(void);
@@ -274,11 +276,13 @@ void YKTickHandler(void){
 		if(tmp->delay == 0 && tmp->pending == NULL && tmp->pendingQueue == NULL){ //if it has reached zero, insert in YKRdyList
 
 			tmp3 = tmp->next;
+			//remove the task from YKSuspList
 			if (tmp->prev == NULL){ //if the top of the delay list is ready
 				YKSuspList = tmp->next;
-				YKSuspList->prev = tmp->prev;
-			}
-			else{
+				YKSuspList->prev = NULL;
+			}else if(tmp->next == NULL){ //if the last TCB in delay list is ready
+				tmp->prev->next = NULL;
+			}else{
 				tmp->prev->next = tmp->next;
 				tmp->next->prev = tmp->prev;
 			}
@@ -319,7 +323,7 @@ void YKTickHandler(void){
 		tmp = tmp->next;
 	}
 #endif
-	
+
 	if (YKISRDepth == 0)
 		YKScheduler();
 
@@ -417,11 +421,12 @@ void YKSemPost(semptr sem){
 	#endif
 
 	//remove the task from YKSuspList
-	if (tmp->prev == NULL){ //if at the top of the suspend list
-			YKSuspList = tmp->next;
-			YKSuspList->prev = NULL;
-	}
-	else{
+	if (tmp->prev == NULL){ //if the top of the delay list is ready
+		YKSuspList = tmp->next;
+		YKSuspList->prev = NULL;
+	}else if(tmp->next == NULL){ //if the last TCB in delay list is ready
+		tmp->prev->next = NULL;
+	}else{
 		tmp->prev->next = tmp->next;
 		tmp->next->prev = tmp->prev;
 	}
@@ -563,7 +568,9 @@ void *YKQPend(YKQ *queue){
 		YKSuspList = tmp;
 
 		YKScheduler();
+		YKEnterMutex();
 	}
+
 	ret = (queue->baseAddress + queue->head); //return oldest message
 	queue->head++; //move head to next oldest message
 	if(queue->head == queue->size){ //if head went past end, reset to 0
@@ -626,11 +633,12 @@ int YKQPost(YKQ *queue, void *msg){
 		#endif
 
 		//remove the task from YKSuspList
-		if (tmp->prev == NULL){ //if at the top of the suspend list
-				YKSuspList = tmp->next;
-				YKSuspList->prev = NULL;
-		}
-		else{
+		if (tmp->prev == NULL){ //if the top of the delay list is ready
+			YKSuspList = tmp->next;
+			YKSuspList->prev = NULL;
+		}else if(tmp->next == NULL){ //if the last TCB in delay list is ready
+			tmp->prev->next = NULL;
+		}else{
 			tmp->prev->next = tmp->next;
 			tmp->next->prev = tmp->prev;
 		}
@@ -683,25 +691,141 @@ int YKQPost(YKQ *queue, void *msg){
 
 //Creates and initializes an event flags group and returns a pointer to the kernel's data structure used to maintain that flags group
 YKEVENT *YKEventCreate(unsigned initialValue){
-
 	YKEVENT *tmp;
+	YKEnterMutex();
+	tmp = &YKEventArray[YKEventIndex];
+	YKEventIndex++;
+	tmp->flag = initialValue;
+	#ifdef DEBUG
+	printString("Created event with initial value ");
+	printInt(tmp->flag);
+	printNewLine();
+	#endif
+	YKExitMutex();
 	return tmp;
 }
 
 //Tests the value of the given event flags group against the mask and mode given in the eventMask and waitMode parameters
 unsigned YKEventPend(YKEVENT *event, unsigned eventMask, int waitMode){
+	TCBptr tmp, tmp2;
+	int flagValues;
+	YKEnterMutex();
+	tmp = YKCurrentTask;
+	if(waitMode == EVENT_WAIT_ALL){
+		if((event->flags & eventMask) == eventMask){
+			flagValues = event->flags
+			YKExitMutex();
+			return flagValues;
+		}
+	}else if(waitMode == EVENT_WAIT_ANY){
+		if((event->flags & eventMask) != 0){
+			flagValues = event->flags
+			YKExitMutex();
+			return flagValues;
+		}
+	}
+	YKSuspCnt++;
+	tmp->pendingEvent = event;
+	tmp->pendingFlags = eventMask;
+	tmp->pendingEventType = waitMode;
 
-	unsigned tmp;
-	return tmp;
+	YKRdyList = tmp->next; /* update the ready list (by removing the current task) */
+	tmp->next->prev = NULL;
 
+	//move the current task to the suspend list
+	if (YKSuspList == NULL){	/* is this first insertion? */
+		tmp->next = NULL;
+	}
+	else{	/* not first insertion */
+		tmp2 = YKSuspList;
+		tmp->next = tmp2;
+		tmp2->prev = tmp;
+	}
+	tmp->prev = NULL;
+	YKSuspList = tmp;
+
+	YKScheduler();
+	YKEnterMutex();
+	flagValues = event->flags
+	YKExitMutex();
+	return flagValues;
 }
 
 //Causes all the bits that are set in the parameter eventMask to be set in the given event flags group
 void YKEventSet(YKEVENT *event, unsigned eventMask){
+	int first;
+	TCBptr tmp, tmp2, nextLoop;
+	YKEnterMutex();
 
+	first = 1;
+
+	#ifdef DEBUG
+	printNewLine();
+	printString("Entering YKEventSet...");
+	printString("SuspList before YKEventSet\n");
+	tmp = YKSuspList;
+	for (i = 0; i < c; i++){
+		printInt(tmp->priority);
+		printNewLine();
+		tmp = tmp->next;
+	}
+	printNewLine();
+	printString("Event flags before set are ");
+	printInt(event->flags);
+	printNewLine();
+	#endif
+
+	tmp = YKSuspList;
+	nextLoop = YKSuspList;
+	while(tmp != NULL){
+		nextLoop = tmp->next;
+		if(tmp->pendingEvent == event){ //if it is pending on this event
+			if((tmp->pendingEventType == EVENT_WAIT_ALL) && ((eventMask & tmp->pendingFlags) == eventMask)
+				|| ((tmp->pendingEventType == EVENT_WAIT_ANY) && ((eventMask & tmp->pendingFlags) != 0))) {
+
+					if (tmp->prev == NULL){ //if the top of the delay list is ready
+						YKSuspList = tmp->next;
+						YKSuspList->prev = NULL;
+					}else if(tmp->next == NULL){
+						tmp->prev->next = NULL;
+					}else{
+						tmp->prev->next = tmp->next;
+						tmp->next->prev = tmp->prev;
+					}
+
+					//add it to the YKRdyList
+					tmp2 = YKRdyList;
+					while (tmp2->priority < tmp->priority){
+						tmp2 = tmp2->next;	//assumes idle task is at end
+					}
+					if (tmp2->prev == NULL){	// insert in list before tmp2
+						YKRdyList = tmp;
+						tmp->prev = NULL;
+						tmp->next = tmp2;
+						tmp2->prev = tmp;
+					}
+					else{
+						tmp2->prev->next = tmp;
+						tmp->prev = tmp2->prev;
+						tmp->next = tmp2;
+						tmp2->prev = tmp;
+					}
+					YKSuspCnt--;
+				}
+		}
+		tmp = nextLoop;
+	}
+
+	if(YKISRDepth == 0){
+		YKScheduler();
+	}else{
+		YKExitMutex();
+	}
 }
 
 //Causes all the bits that are set in the parameter eventMask to be reset (made 0) in the given event flags group
 void YKEventReset(YKEVENT *event, unsigned eventMask){
-
+	YKEnterMutex();
+	event->flag = (event->flag & (~eventMask));
+	YKExitMutex();
 }

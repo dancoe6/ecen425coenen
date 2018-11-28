@@ -1,6 +1,9 @@
 
 #include "yaku.h"
 
+#define EVENT_WAIT_ANY 0x8
+#define EVENT_WAIT_ALL 0x0
+
 extern int YKCtxSwCount; //Global variable tracking context switches
 extern int YKIdleCount; //Global variable used by idle task
 extern int YKTickNum; //Global variable incremented by tick handler
@@ -9,6 +12,7 @@ enum taskState{ running, ready, delayed, suspended};
 typedef struct taskblock *TCBptr;
 typedef struct semaphore *semptr;
 typedef struct msgqueue* YKQptr;
+typedef struct event* YKEventptr;
 typedef struct taskblock
 {				/* the TCB struct definition */
     void *stackptr;		/* pointer to current top of stack */
@@ -32,6 +36,9 @@ typedef struct taskblock
     TCBptr prev;		/* backward ptr for dbl linked list */
     semptr pending; /*semaphore that task is waiting for*/
     YKQptr pendingQueue;
+    YKEventptr pendingEvent;
+    int pendingFlags;
+    int pendingEventType;
 }  TCB;
 
 extern TCBptr YKRdyList;		/* a list of TCBs of all ready tasks
@@ -65,8 +72,10 @@ extern YKQ YKQArray[MAX_QUEUE_COUNT];
 //event struct
 typedef struct event
 {
-	int flag;
+	int flags;
 } YKEVENT;
+
+extern YKEVENT YKEventArray[MAX_EVENT_COUNT];
 
 
 //Initializes all required kernel data structures
