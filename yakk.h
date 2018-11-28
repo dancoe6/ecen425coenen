@@ -72,7 +72,7 @@ extern YKQ YKQArray[MAX_QUEUE_COUNT];
 //event struct
 typedef struct event
 {
-	int flags;
+	unsigned flags;
 } YKEVENT;
 
 extern YKEVENT YKEventArray[MAX_EVENT_COUNT];

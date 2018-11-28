@@ -273,7 +273,7 @@ void YKTickHandler(void){
 	for (i = 0; i < c; i++){
 
 
-		if(tmp->delay == 0 && tmp->pending == NULL && tmp->pendingQueue == NULL){ //if it has reached zero, insert in YKRdyList
+		if(tmp->delay == 0 && tmp->pending == NULL && tmp->pendingQueue == NULL && tmp->pendingEvent == NULL){ //if it has reached zero, insert in YKRdyList
 
 			tmp3 = tmp->next;
 			//remove the task from YKSuspList
@@ -695,12 +695,12 @@ YKEVENT *YKEventCreate(unsigned initialValue){
 	YKEnterMutex();
 	tmp = &YKEventArray[YKEventIndex];
 	YKEventIndex++;
-	tmp->flag = initialValue;
-	#ifdef DEBUG
+	tmp->flags = initialValue;
+	//#ifdef DEBUG
 	printString("Created event with initial value ");
-	printInt(tmp->flag);
+	printInt(tmp->flags);
 	printNewLine();
-	#endif
+	//#endif
 	YKExitMutex();
 	return tmp;
 }
@@ -708,18 +708,18 @@ YKEVENT *YKEventCreate(unsigned initialValue){
 //Tests the value of the given event flags group against the mask and mode given in the eventMask and waitMode parameters
 unsigned YKEventPend(YKEVENT *event, unsigned eventMask, int waitMode){
 	TCBptr tmp, tmp2;
-	int flagValues;
+	unsigned flagValues;
 	YKEnterMutex();
 	tmp = YKCurrentTask;
 	if(waitMode == EVENT_WAIT_ALL){
 		if((event->flags & eventMask) == eventMask){
-			flagValues = event->flags
+			flagValues = event->flags;
 			YKExitMutex();
 			return flagValues;
 		}
 	}else if(waitMode == EVENT_WAIT_ANY){
 		if((event->flags & eventMask) != 0){
-			flagValues = event->flags
+			flagValues = event->flags;
 			YKExitMutex();
 			return flagValues;
 		}
@@ -743,21 +743,18 @@ unsigned YKEventPend(YKEVENT *event, unsigned eventMask, int waitMode){
 	}
 	tmp->prev = NULL;
 	YKSuspList = tmp;
-
 	YKScheduler();
 	YKEnterMutex();
-	flagValues = event->flags
+	flagValues = event->flags;
 	YKExitMutex();
 	return flagValues;
 }
 
 //Causes all the bits that are set in the parameter eventMask to be set in the given event flags group
 void YKEventSet(YKEVENT *event, unsigned eventMask){
-	int first;
 	TCBptr tmp, tmp2, nextLoop;
 	YKEnterMutex();
 
-	first = 1;
 
 	#ifdef DEBUG
 	printNewLine();
@@ -775,13 +772,15 @@ void YKEventSet(YKEVENT *event, unsigned eventMask){
 	printNewLine();
 	#endif
 
+	event->flags = (event->flags | eventMask);
+
 	tmp = YKSuspList;
 	nextLoop = YKSuspList;
 	while(tmp != NULL){
 		nextLoop = tmp->next;
 		if(tmp->pendingEvent == event){ //if it is pending on this event
-			if((tmp->pendingEventType == EVENT_WAIT_ALL) && ((eventMask & tmp->pendingFlags) == eventMask)
-				|| ((tmp->pendingEventType == EVENT_WAIT_ANY) && ((eventMask & tmp->pendingFlags) != 0))) {
+			if(((tmp->pendingEventType == EVENT_WAIT_ALL) && ((event->flags & tmp->pendingFlags) == tmp->pendingFlags))
+				|| ((tmp->pendingEventType == EVENT_WAIT_ANY) && ((event->flags & tmp->pendingFlags) != 0))) {
 
 					if (tmp->prev == NULL){ //if the top of the delay list is ready
 						YKSuspList = tmp->next;
@@ -810,6 +809,10 @@ void YKEventSet(YKEVENT *event, unsigned eventMask){
 						tmp->next = tmp2;
 						tmp2->prev = tmp;
 					}
+
+					 tmp->pendingEvent = NULL;
+					// tmp->pendingFlags = 0;
+					// tmp->pendingEventType = 0;
 					YKSuspCnt--;
 				}
 		}
@@ -826,6 +829,6 @@ void YKEventSet(YKEVENT *event, unsigned eventMask){
 //Causes all the bits that are set in the parameter eventMask to be reset (made 0) in the given event flags group
 void YKEventReset(YKEVENT *event, unsigned eventMask){
 	YKEnterMutex();
-	event->flag = (event->flag & (~eventMask));
+	event->flags = (event->flags & (~eventMask));
 	YKExitMutex();
 }
