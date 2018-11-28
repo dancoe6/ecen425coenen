@@ -53,8 +53,6 @@ extern YKSEM YKSemArray[MAX_SEM_COUNT];
 //queue struct
 typedef struct msgqueue
 {
-    /* What goes here?? */
-    // int info;
     int head;
     int tail;
     void** baseAddress;
@@ -63,6 +61,12 @@ typedef struct msgqueue
 } YKQ;
 
 extern YKQ YKQArray[MAX_QUEUE_COUNT];
+
+//event struct
+typedef struct event
+{
+	int flag;
+} YKEVENT;
 
 
 //Initializes all required kernel data structures
@@ -119,3 +123,15 @@ void *YKQPend(YKQ *queue);
 
 //Place a message in a message queue
 int YKQPost(YKQ *queue, void *msg);
+
+//Creates and initializes an event flags group and returns a pointer to the kernel's data structure used to maintain that flags group
+YKEVENT *YKEventCreate(unsigned initialValue);
+
+//Tests the value of the given event flags group against the mask and mode given in the eventMask and waitMode parameters
+unsigned YKEventPend(YKEVENT *event, unsigned eventMask, int waitMode);
+
+//Causes all the bits that are set in the parameter eventMask to be set in the given event flags group
+void YKEventSet(YKEVENT *event, unsigned eventMask);
+
+//Causes all the bits that are set in the parameter eventMask to be reset (made 0) in the given event flags group
+void YKEventReset(YKEVENT *event, unsigned eventMask);

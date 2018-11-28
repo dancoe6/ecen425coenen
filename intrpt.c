@@ -1,16 +1,18 @@
 #include "clib.h"
 #include "yakk.h"
 #include "lab6defs.h"
-//#include "intrpt.h"
+#include "lab7defs.h"
 
-#define LAB6
+#define LAB7
 
 extern int KeyBuffer;
 static unsigned int tick_count;
 
+#ifdef LAB6
 extern YKQ *MsgQPtr;
 extern struct msg MsgArray[];
 extern int GlobalFlag;
+#endif
 
 void resetHandler(void){
 exit(0);
@@ -37,6 +39,12 @@ void tickHandler(void){
      else if (++next >= MSGARRAYSIZE)
 	next = 0;
 
+#endif
+
+#ifdef LAB7
+
+tick_count++;
+
 #else
 tick_count++;
 printNewLine();
@@ -55,6 +63,26 @@ void keyboardHandler(void){
 
 GlobalFlag = 1;
 
+#endif
+
+#ifdef LAB7
+
+    char c;
+    c = KeyBuffer;
+
+    if(c == 'a') YKEventSet(charEvent, EVENT_A_KEY);
+    else if(c == 'b') YKEventSet(charEvent, EVENT_B_KEY);
+    else if(c == 'c') YKEventSet(charEvent, EVENT_C_KEY);
+    else if(c == 'd') YKEventSet(charEvent, EVENT_A_KEY | EVENT_B_KEY | EVENT_C_KEY);
+    else if(c == '1') YKEventSet(numEvent, EVENT_1_KEY);
+    else if(c == '2') YKEventSet(numEvent, EVENT_2_KEY);
+    else if(c == '3') YKEventSet(numEvent, EVENT_3_KEY);
+    else {
+        print("\nKEYPRESS (", 11);
+        printChar(c);
+        print(") IGNORED\n", 10);
+    }
+
 #else
 unsigned int delay = 0;
 if(KeyBuffer == 'd'){
@@ -68,10 +96,7 @@ printString("DELAY COMPLETE");
 printNewLine();
 }
 else if(KeyBuffer == 'p'){
-	//printString("p key pressed, need to uncomment yksempost");
-	//printNewLine();
 	YKSemPost(&YKSemArray[3]);
-
 }else{
 printNewLine();
 printString("KEYPRESS (");

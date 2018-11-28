@@ -680,3 +680,28 @@ int YKQPost(YKQ *queue, void *msg){
 		return 0; //failed, no room in queue
 	}
 }
+
+//Creates and initializes an event flags group and returns a pointer to the kernel's data structure used to maintain that flags group
+YKEVENT *YKEventCreate(unsigned initialValue){
+
+	YKEVENT *tmp;
+	return tmp;
+}
+
+//Tests the value of the given event flags group against the mask and mode given in the eventMask and waitMode parameters
+unsigned YKEventPend(YKEVENT *event, unsigned eventMask, int waitMode){
+
+	unsigned tmp;
+	return tmp;
+
+}
+
+//Causes all the bits that are set in the parameter eventMask to be set in the given event flags group
+void YKEventSet(YKEVENT *event, unsigned eventMask){
+
+}
+
+//Causes all the bits that are set in the parameter eventMask to be reset (made 0) in the given event flags group
+void YKEventReset(YKEVENT *event, unsigned eventMask){
+
+}
