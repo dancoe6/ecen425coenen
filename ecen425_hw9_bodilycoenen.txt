@@ -8,7 +8,7 @@ ECEN 425 HW9
 	This process was repeated for every critical section, multiple times, and the longest section was determined.
 	Other lengthy critical sections are: YKSemPend - 141, YKDelayTask - 138, YKQPend - 141, YKTickHandler - 194, YKQPost - 154 
 
-2. 	Worst case interrupt latency: 232 + 20 = 253 instructions.
+2. 	Worst case interrupt latency: 232 + 20 = 252 instructions.
 	This was measured by adding the length of the longest critical section to the length of the longest ISR (counted by referencing the assembly file).
 
 3. 	Overhead to post to a semaphore: Maximum of 193 instructions.
