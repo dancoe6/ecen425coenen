@@ -1,0 +1,30 @@
+Conor Bodily, Daniel Coenen
+ECEN 425 HW9
+
+
+1. 	Longest critical section: Found in YKSemPost - 232 instructions
+	This was measured by placing a breakpoint at the call of the assembly mutex function (corresponding to YKEnterMutex) and then using the "eto" command to measure how many instructions
+	occurred until the assembly unmutex function (corresponding to YKExitMutex). 
+	This process was repeated for every critical section, multiple times, and the longest section was determined.
+	Other lengthy critical sections are: YKSemPend - 141, YKDelayTask - 138, YKQPend - 141, YKTickHandler - 194, YKQPost - 154 
+
+2. 	Worst case interrupt latency: 232 + 20 = 253 instructions.
+	This was measured by adding the length of the longest critical section to the length of the longest ISR (counted by referencing the assembly file).
+
+3. 	Overhead to post to a semaphore: Maximum of 193 instructions.
+	This was measured by placing a breakpoint at the call of YKSemPost, then using the "eto" command to measure how many instructions occured until the "ret" instruction of YKSemPost.
+	This process was repeated many times to determine the maximum number of instructions.
+
+4. 	Overhead to pend to a semaphore: Maximum of 162 instructions.
+	This was measured by placing a breakpoint at the call of YKSemPend, then using the "eto" command to measure how many instructions occured until the "ret" instruction of YKSemPend.
+	This process was repeated many times to determine the maximum number of instructions.
+
+5. 	Overhead to switch contexts with YKDelayTask: Maximum of 133 instructions.
+	This was measured by placing a breakpoint at the call of YKSemPost, then using the "eto" command to measure how many instructions occured until the "iret" instruction of the assembly dispatcher function.
+	This process was repeated many times to determine the maximum number of instructions.
+
+6.	Size of YAK C source code:
+
+7.	Size of YAK assembly source code: 
+
+9.	Amount of memory required in bytes:
