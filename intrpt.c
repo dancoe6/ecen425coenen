@@ -2,7 +2,7 @@
 #include "yakk.h"
 #include "lab7defs.h"
 
-#define LAB7
+#define LAB8S
 
 extern int KeyBuffer;
 static unsigned int tick_count;
@@ -19,6 +19,11 @@ exit(0);
 
 
 void tickHandler(void){
+
+#ifdef LAB8
+
+
+#endif
 
 #ifdef LAB6
 
@@ -58,29 +63,15 @@ printNewLine();
 
 void keyboardHandler(void){
 
+#ifdef LAB8
+
+
+#endif
+
 #ifdef LAB6
 
 GlobalFlag = 1;
 
-#endif
-
-#ifdef LAB7
-
-    char c;
-    c = KeyBuffer;
-
-    if(c == 'a') YKEventSet(charEvent, EVENT_A_KEY);
-    else if(c == 'b') YKEventSet(charEvent, EVENT_B_KEY);
-    else if(c == 'c') YKEventSet(charEvent, EVENT_C_KEY);
-    else if(c == 'd') YKEventSet(charEvent, EVENT_A_KEY | EVENT_B_KEY | EVENT_C_KEY);
-    else if(c == '1') YKEventSet(numEvent, EVENT_1_KEY);
-    else if(c == '2') YKEventSet(numEvent, EVENT_2_KEY);
-    else if(c == '3') YKEventSet(numEvent, EVENT_3_KEY);
-    else {
-        print("\nKEYPRESS (", 11);
-        printChar(c);
-        print(") IGNORED\n", 10);
-    }
 
 #else
 unsigned int delay = 0;
