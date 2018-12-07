@@ -1,8 +1,8 @@
 #include "clib.h"
 #include "yakk.h"
-#include "lab7defs.h"
+#include "lab8defs.h"
 
-#define LAB8S
+#define LAB8
 
 extern int KeyBuffer;
 static unsigned int tick_count;
@@ -10,6 +10,7 @@ static unsigned int tick_count;
 #ifdef LAB6
 extern YKQ *MsgQPtr;
 extern struct msg MsgArray[];
+
 extern int GlobalFlag;
 #endif
 
@@ -39,15 +40,19 @@ void tickHandler(void){
     MsgArray[next].data = data;
     YKExitMutex();
      if (YKQPost(MsgQPtr, (void *) &(MsgArray[next])) == 0)
-	printString("  TickISR: queue overflow! \n");
+	     printString("  TickISR: queue overflow! \n");
      else if (++next >= MSGARRAYSIZE)
-	next = 0;
+	     next = 0;
 
 #endif
 
 #ifdef LAB7
 
 tick_count++;
+
+#endif
+
+#ifdef LAB8
 
 #else
 tick_count++;
@@ -97,4 +102,15 @@ printNewLine();
 
 #endif
 
+}
+
+
+
+void newPieceHandler(void){
+  YKSemPost(NSemPtr);
+
+}
+
+void receivedCommandHandler(void){
+  YKSemPost(SSemPtr);
 }

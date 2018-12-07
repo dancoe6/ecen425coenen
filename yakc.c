@@ -542,11 +542,11 @@ YKQ *YKQCreate(void **start, unsigned size){
 void *YKQPend(YKQ *queue){
 	void** ret;
 	TCBptr tmp,tmp2;
-	#ifdef DEBUG
+	// #ifdef DEBUG
 	printString("YKQPend: message #");
 	printInt(queue->currentSize);
 	printNewLine();
-	#endif
+	// #endif
 	YKEnterMutex();
 	if(queue->currentSize == 0){
 		YKSuspCnt++;
@@ -626,7 +626,7 @@ int YKQPost(YKQ *queue, void *msg){
 
 		tmp = topPriority; //select the highest priority task pending this queue
 
-		#ifdef DEBUGr
+		#ifdef DEBUG
 		printString("Top priority pending queue task's priority is ");
 		printInt(tmp->priority);
 		printNewLine();
@@ -675,8 +675,6 @@ int YKQPost(YKQ *queue, void *msg){
 		#endif
 
 		if(YKISRDepth == 0){
-			printInt(YKISRDepth);
-			printNewLine();
 			YKScheduler();
 		}else{
 			YKExitMutex();
