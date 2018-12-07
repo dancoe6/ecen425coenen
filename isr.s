@@ -90,3 +90,38 @@ keyboard_isr:
 	pop bx
 	pop ax
 	iret
+
+game_over:
+  push ax
+  mov	al, 0x20	; Load nonspecific EOI value (0x20) into register al
+  out	0x20, al	; Write EOI to PIC (port 0x20)
+  pop ax
+  iret
+
+new_piece:
+  push ax
+  mov	al, 0x20	; Load nonspecific EOI value (0x20) into register al
+  out	0x20, al	; Write EOI to PIC (port 0x20)
+  pop ax
+  iret
+
+received_command:
+  push ax
+  mov	al, 0x20	; Load nonspecific EOI value (0x20) into register al
+  out	0x20, al	; Write EOI to PIC (port 0x20)
+  pop ax
+  iret
+
+touchdown:
+  push ax
+  mov	al, 0x20	; Load nonspecific EOI value (0x20) into register al
+  out	0x20, al	; Write EOI to PIC (port 0x20)
+  pop ax
+  iret
+
+line_clear:
+  push ax
+  mov	al, 0x20	; Load nonspecific EOI value (0x20) into register al
+  out	0x20, al	; Write EOI to PIC (port 0x20)
+  pop ax
+  iret
