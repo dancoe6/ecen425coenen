@@ -4,10 +4,11 @@ Revision date: 4 November
 Description: Required definitions for EE 425 lab 8 (Message queues)
 */
 
-#define MSGARRAYSIZE      20
+#define MSGARRAYSIZE	24
 
 struct msg 
 {
-    int tick;
-    int data;
+    int id;
+    int type;
+	int direction;
 };

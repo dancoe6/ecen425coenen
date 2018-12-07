@@ -7,28 +7,33 @@ Description: Application code for EE 425 lab 7 (Event flags)
 #include "clib.h"
 #include "yakk.h"                     /* contains kernel definitions */
 #include "simptris.h"
+#include "lab8defs.h"
 
 #define TASK_STACK_SIZE   512         /* stack size in words */
+#define MSGQSIZE 24
 
+struct msg MsgArray[MSGARRAYSIZE];  /* buffers for message content */
 
+int Task1Stk[TASK_STACK_SIZE];     /* a stack for each task */
+int Task2Stk[TASK_STACK_SIZE];     /* a stack for each task */
+int Task3Stk[TASK_STACK_SIZE];     /* a stack for each task */
 
-int Task1STK[TASK_STACK_SIZE];     /* a stack for each task */
-int Task2STK[TASK_STACK_SIZE];     /* a stack for each task */
-int Task3STK[TASK_STACK_SIZE];     /* a stack for each task */
+YKSEM *SSemPtr;              /* YKSEM must be defined in yakk.h */
+void *MsgQ[MSGQSIZE];           /* space for message queue */
+YKQ *MsgQPtr;                   /* actual name of queue */
 
-
-void Task1(void) 
+void MessengerTask(void) /* Sends commands to simptris */
 {
 
 }
 
 
-void Task2(void)    
+void MovementTask(void) /* Looks at new piece and decides piece movements */
 {
  
 }
 
-void Task3(void)           /* tracks statistics */
+void StatTask(void)           /* tracks statistics */
 {
     unsigned max, switchCount, idleCount;
     int tmp;
@@ -50,13 +55,13 @@ void Task3(void)           /* tracks statistics */
         switchCount = YKCtxSwCount;
         idleCount = YKIdleCount;
         YKExitMutex();
-        
-        printString("<<<<< Context switches: ");
+       
+        printString("<CS: ");
         printInt((int)switchCount);
-        printString(", CPU usage: ");
+        printString(", CPU: ");
         tmp = (int) (idleCount/max);
         printInt(100-tmp);
-        printString("% >>>>>\r\n");
+        printString(">\r\n");
         
         YKEnterMutex();
         YKCtxSwCount = 0;
@@ -69,6 +74,13 @@ void Task3(void)           /* tracks statistics */
 void main(void)
 {
     YKInitialize();
-    
+
+	MsgQPtr = YKQCreate(MsgQ, MSGQSIZE);
+	SSemPtr = YKSemCreate(0);
+
+	YKNewTask(MessengerTask, (void *) &Task1Stk[TASK_STACK_SIZE], 1);
+	YKNewTask(MovementTask, (void *) &Task2Stk[TASK_STACK_SIZE], 2);  
+	YKNewTask(StatTask, (void *) &Task3Stk[TASK_STACK_SIZE], 3);      	
+
     YKRun();
 }

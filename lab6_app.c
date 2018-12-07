@@ -9,7 +9,7 @@ Description: Application code for EE 425 lab 6 (Message queues)
 #include "lab6defs.h"               /* contains definitions for this lab */
 
 #define TASK_STACK_SIZE   512       /* stack size in words */
-#define MSGQSIZE          10
+#define MSGQSIZE          24
 
 struct msg MsgArray[MSGARRAYSIZE];  /* buffers for message content */
 
