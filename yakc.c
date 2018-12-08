@@ -542,11 +542,11 @@ YKQ *YKQCreate(void **start, unsigned size){
 void *YKQPend(YKQ *queue){
 	void** ret;
 	TCBptr tmp,tmp2;
-	// #ifdef DEBUG
+	 #ifdef DEBUG
 	printString("YKQPend: message #");
 	printInt(queue->currentSize);
 	printNewLine();
-	// #endif
+	 #endif
 	YKEnterMutex();
 	if(queue->currentSize == 0){
 		YKSuspCnt++;

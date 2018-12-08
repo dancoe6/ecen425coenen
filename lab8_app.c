@@ -11,6 +11,7 @@ Description: Application code for EE 425 lab 7 (Event flags)
 
 #define TASK_STACK_SIZE   512         /* stack size in words */
 #define MSGQSIZE 30
+//#define APP_DEBUG
 
 struct msg MsgArray[MSGARRAYSIZE];  /* buffers for message content */
 
@@ -27,6 +28,8 @@ extern unsigned NewPieceID;
 extern unsigned NewPieceType;
 extern unsigned NewPieceOrientation;
 extern unsigned NewPieceColumn;
+
+
 // extern unsigned ScreenBitMap0;
 // extern unsigned ScreenBitMap1;
 // extern unsigned ScreenBitMap2;
@@ -42,10 +45,12 @@ void postMovement(unsigned id, unsigned type, unsigned direction){
   MsgArray[next].id = (int)id;
   MsgArray[next].type = (int)type;
   MsgArray[next].direction = (int)direction;
+#ifdef APP_DEBUG
   printString("New movement");
   printNewLine();
   printInt((int)type);
   printNewLine();
+#endif
   YKExitMutex();
   if (YKQPost(MsgQPtr, (void *) &(MsgArray[next])) == 0)
     printString("  TickISR: queue overflow! \n");
@@ -54,6 +59,14 @@ void postMovement(unsigned id, unsigned type, unsigned direction){
 }
 
 void moveToColumn(unsigned pieceID, unsigned pieceColumn, unsigned targetColumn){
+#ifdef APP_DEBUG
+  printString("Column Movement");
+  printNewLine();
+  printInt(pieceColumn);
+  printString("-> ");
+  printInt(targetColumn);
+  printNewLine();
+#endif
   while(pieceColumn != targetColumn){
     if(pieceColumn > targetColumn){
         postMovement(pieceID,0,0);
@@ -87,12 +100,23 @@ void MessengerTask(void) /* Sends commands to simptris */
 
   while(1){
     tmp = (struct msg *) YKQPend(MsgQPtr); //wait for a message to be posted to queue
+#ifdef APP_DEBUG
+  printString("Left bin: ");
+  printInt(leftHeight);
+  printNewLine();
+  printString("Right bin: ");
+  printInt(rightHeight);
+  printNewLine();
+#endif
+
+#ifdef APP_DEBUG
     printString("New command");
     printNewLine();
     printInt((int)tmp->type);
     printNewLine();
     printInt((int)tmp->direction);
     printNewLine();
+#endif
     if(tmp->type == 0){ //if it is a slide
       SlidePiece(tmp->id,tmp->direction);
     }else{//if it is a rotate
@@ -108,18 +132,20 @@ void MovementTask(void) /* Looks at new piece and decides piece movements */
   static int next = 0;
   static char leftFlat = 1; //1 means it is flat, 0 means it is not flat
   static char rightFlat = 1; //1 means it is flat, 0 means it is not flat
-  static char rightMostRecent = 0; //0 means left is most recent, 1 means right is most recent
+  //static char rightMostRecent = 0; //0 means left is most recent, 1 means right is most recent
+  static int rightHeight = 0;
+  static int leftHeight = 0;
   /*
   instead of doing right most recent, we should track height of each bin
   */
 
-  int id;
-  int type;
-  int direction;
-  unsigned pieceID = 0;
-  unsigned pieceType = 0;
-  unsigned pieceOrientation = 0;
-  unsigned pieceColumn = 0;
+  static int id;
+  static int type;
+  static int direction;
+  static unsigned pieceID = 0;
+  static unsigned pieceType = 0;
+  static unsigned pieceOrientation = 0;
+  static unsigned pieceColumn = 0;
 
   while(1){
 
@@ -131,6 +157,7 @@ void MovementTask(void) /* Looks at new piece and decides piece movements */
     pieceType = NewPieceType;
     pieceOrientation = NewPieceOrientation;
     pieceColumn = NewPieceColumn;
+#ifdef APP_DEBUG
     printString("New Piece");
     printNewLine();
     printInt((int)pieceType);
@@ -139,60 +166,69 @@ void MovementTask(void) /* Looks at new piece and decides piece movements */
     printNewLine();
     printInt((int)pieceColumn);
     printNewLine();
+#endif
     YKExitMutex();
-    if(pieceType == 1){ //if it is straight
+    if(pieceType == 1){ //if straight piece
       if(leftFlat && rightFlat){ //if both sides are flat
-        if(rightMostRecent){ //left bin is shorter, place there
+        if(leftHeight <= rightHeight){ //left bin is shorter, place there
           moveToColumn(pieceID,pieceColumn,1);
           rotateToOrientation(pieceID,pieceOrientation,0);
-          rightMostRecent = 0;
+          //rightMostRecent = 0;
+          leftHeight++;
         }else{ //right bin is shorter, place there
           moveToColumn(pieceID,pieceColumn,4);
           rotateToOrientation(pieceID,pieceOrientation,0);
-          rightMostRecent = 1;
+          //rightMostRecent = 1;
+          rightHeight++;
         }
       }else if(leftFlat){ //if left is flat
         moveToColumn(pieceID,pieceColumn,1);
         rotateToOrientation(pieceID,pieceOrientation,0);
-        rightMostRecent = 0;
+        //rightMostRecent = 0;
+        leftHeight++;
       }else{ //right is flat ( one of the two bins must always be flat)
         moveToColumn(pieceID,pieceColumn,4);
         rotateToOrientation(pieceID,pieceOrientation,0);
-        rightMostRecent = 1;
+        //rightMostRecent = 1;
+        rightHeight++;
       }
-    }else{ //is corner piece
+    }else{ //if corner piece
       if(!leftFlat){ //if left is not flat
         //move to column 2
         //rotate until newPieceOrientation == 2
         moveToColumn(pieceID,pieceColumn,2);
         rotateToOrientation(pieceID,pieceOrientation,2);
-        rightMostRecent = 0;
+        //rightMostRecent = 0;
+        leftHeight += 2;
         leftFlat = 1;
       }else if(!rightFlat){ //if right is not is flat
         //move to column 3
         //rotate until newPieceOrientation == 3
         moveToColumn(pieceID,pieceColumn,3);
         rotateToOrientation(pieceID,pieceOrientation,3);
-        rightMostRecent = 1;
+        //rightMostRecent = 1;
+        rightHeight += 2;
         rightFlat = 1;
       }else{//both bins are flat, choose shorter
-        if(rightMostRecent){ //left bin is shorter, place there
+        if(leftHeight <= rightHeight){ //left bin is shorter, place there
           //move to column 1
           //rotate until newPieceOrientation == 0
           //move to column 0
           moveToColumn(pieceID,pieceColumn,1);
+          pieceColumn = 1;
           rotateToOrientation(pieceID,pieceOrientation,0);
           moveToColumn(pieceID,pieceColumn,0);
-          rightMostRecent = 0;
+          //rightMostRecent = 0;
           leftFlat = 0;
         }else{ //right bin is shorter, place there
           //move to column 4
           //rotate until newPieceOrientation == 1
           //move to column 5
           moveToColumn(pieceID,pieceColumn,4);
+          pieceColumn = 4;
           rotateToOrientation(pieceID,pieceOrientation,1);
           moveToColumn(pieceID,pieceColumn,5);
-          rightMostRecent = 1;
+          //rightMostRecent = 1;
           rightFlat = 0;
         }
       }
@@ -214,8 +250,9 @@ void StatTask(void)           /* tracks statistics */
     max = YKIdleCount / 25;
     YKIdleCount = 0;
 
-    YKNewTask(MessengerTask, (void *) &Task1Stk[TASK_STACK_SIZE], 1);
-  	YKNewTask(MovementTask, (void *) &Task2Stk[TASK_STACK_SIZE], 2);
+
+  	YKNewTask(MovementTask, (void *) &Task2Stk[TASK_STACK_SIZE], 1);
+    YKNewTask(MessengerTask, (void *) &Task1Stk[TASK_STACK_SIZE], 2);
     StartSimptris();
 
     while (1)
